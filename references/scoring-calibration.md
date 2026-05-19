@@ -7,6 +7,8 @@ Each score level is anchored to observable, verifiable characteristics.
 
 ## Dimension 1: Boundary Topology
 
+### Public Company
+
 | Score | Anchor Case | Observable Characteristics |
 |-------|------------|---------------------------|
 | **5** | Berkshire Hathaway (2010s) | Crystal-clear operating subsidiary autonomy, hard financial discipline (never crosses into subsidiaries' debt), strong cultural soft constraints via annual letters, low transaction costs from long-term relationships |
@@ -15,9 +17,21 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | WeWork (2019) | Boundary dissolution (what business are we in?), soft constraints effectively gone (founder narrative replacing institutional norms), massive hidden transaction costs |
 | **1** | Enron (2001) | Hard constraint violation (regulatory/legal), complete soft constraint collapse, off-balance-sheet structures = boundary fraud |
 
+### Geopolitical
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Switzerland (ongoing) | Clear federal boundaries, institutionalized neutrality, strong cantonal autonomy, high soft-constraint trust |
+| **4** | Singapore | Precise territorial/economic boundaries, effective regulatory regime, controlled permeability |
+| **3** | Turkey (Erdoğan era) | NATO member but independent foreign policy, East/West boundary ambiguous, soft constraints fluid |
+| **2** | Pakistan | Contested borders (Kashmir), limited control over tribal areas, weak institutional soft constraints |
+| **1** | Somalia / Yemen | State boundaries on paper only, central power cannot reach territory, no functional soft constraints |
+
 ---
 
 ## Dimension 2: Incentive Architecture
+
+### Public Company
 
 | Score | Anchor Case | Observable Characteristics |
 |-------|------------|---------------------------|
@@ -27,9 +41,21 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | Wells Fargo (2016) | Famous case of incentive inversion: sales quotas → 3.5M fake accounts. Stated values = customer service; actual rewards = raw account numbers |
 | **1** | FTX (2022) | Complete incentive-compatibility failure: customer funds treated as internal treasury, no separation of interests, principal-agent collapse at every level |
 
+### Geopolitical
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Denmark / Norway | High-tax/high-service social contract, strong incentive compatibility, positive-sum welfare dynamics |
+| **4** | Germany | Industrial consensus model (Mittelstand + unions), incentives aligned but EU membership strains |
+| **3** | India | Democratic incentives mix with patronage networks, reform incentives weakened by electoral calculus |
+| **2** | Russia (Putin era) | Extractive incentive architecture, loyalty rewarded over competence, sanctions create perverse macro incentives |
+| **1** | North Korea | Total incentive inversion, survival requires loyalty performance, productive output irrelevant |
+
 ---
 
 ## Dimension 3: Information Neurology
+
+### Public Company
 
 | Score | Anchor Case | Observable Characteristics |
 |-------|------------|---------------------------|
@@ -39,9 +65,21 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | Boeing (2019-2020) | 737 MAX crisis: safety feedback systematically suppressed, decision-makers in partial fantasy world, positive feedback loop (schedule pressure → safety cutting → more pressure) fully established |
 | **1** | Soviet Gosplan (late 1980s) | Classic fantasy world: planners receiving fabricated output numbers from enterprises, completely decoupled from reality, negative feedback loops fully disabled |
 
+### Geopolitical
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Taiwan | Vibrant press, effective counter-disinformation infrastructure, high information velocity, open debate |
+| **4** | South Korea | Strong media landscape, some chaebol influence on coverage, rapid digital information flow |
+| **3** | Brazil | Free press exists but fragmented environment, social media disinformation severe, mixed feedback quality |
+| **2** | Iran | Dual information system (state vs underground), severe filtering, decision-makers partially disconnected |
+| **1** | Turkmenistan / Eritrea | Near-total information control, decision-makers in complete fantasy world, zero external signal |
+
 ---
 
 ## Dimension 4: Temporal Metabolism
+
+### Public Company
 
 | Score | Anchor Case | Observable Characteristics |
 |-------|------------|---------------------------|
@@ -51,9 +89,21 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | GE (Immelt era) | Classic temporal cannibalism: financial engineering masking industrial decline, stock buybacks instead of R&D, divesting future for present EPS |
 | **1** | Toys "R" Us (2017) | LBO debt structure made temporal investment impossible, forced to optimize for debt service at expense of store refresh, e-commerce investment, talent — consumed its own future |
 
+### Geopolitical
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | China (infrastructure lens) | Massive long-term infrastructure/technology investment, accepts short-term costs for long-term positioning |
+| **4** | UAE (Vision 2030/2071) | Deliberate economic diversification away from oil, long-horizon planning, patience capital |
+| **3** | Brazil | Cyclical between investment and crisis, some long-term plans but political instability disrupts execution |
+| **2** | Argentina | Chronic temporal cannibalism, money printing funds present at expense of future, recurring default cycles |
+| **1** | Venezuela (2015-present) | Consuming all future capacity to fund present crisis, negative optionality, seed corn eaten |
+
 ---
 
 ## Dimension 5: Legitimacy & Narrative
+
+### Public Company
 
 | Score | Anchor Case | Observable Characteristics |
 |-------|------------|---------------------------|
@@ -63,9 +113,21 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | WeWork (2019) | Adam Neumann's "elevate the world's consciousness" narrative entirely disconnected from a real estate subletting business; internal eye-rolling rampant; IPO collapse = legitimacy debt called |
 | **1** | Theranos (2015-2018) | Total narrative fraud: stated capabilities (blood testing revolution) fabricated, legitimacy built entirely on false claims, complete narrative-reality inversion |
 
+### Geopolitical
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Japan | Strong national identity narrative, high internal coherence, legitimate democratic institutions, adaptive mythos |
+| **4** | France | Powerful national narrative under strain from inequality/immigration, legitimacy debts accumulating but intact |
+| **3** | Turkey | Competing Kemalist vs Islamist narratives, neither fully dominant, identity tension unresolved |
+| **2** | Myanmar (post-2021) | Military legitimacy rejected by majority, dual governance claim, narrative collapse in progress |
+| **1** | Afghanistan (post-2021) | Taliban narrative rejected by urban population, no unified national story, identity void |
+
 ---
 
 ## Dimension 6: Coupling Architecture
+
+### Public Company
 
 | Score | Anchor Case | Observable Characteristics |
 |-------|------------|---------------------------|
@@ -75,9 +137,21 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | Global financial system (2008) | Mortgage securitization created hidden tight coupling across nominally independent institutions; failure of one triggered cascade across all; no adequate buffers |
 | **1** | Fukushima Daiichi (2011) | Perrow's normal accident in pure form: tight coupling (diesel backup generators in flood zone) + complexity (multiple simultaneous failure modes) = unavoidable catastrophic cascade |
 
+### Geopolitical
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Switzerland | Federal structure creates fault isolation, diversified economy, adequate financial/political buffers |
+| **4** | Australia | Geographic isolation as natural buffer, diversified economy but China trade dependency notable |
+| **3** | South Korea | High efficiency but existential DPRK coupling, semiconductor concentration, US alliance dependency |
+| **2** | Ukraine (pre-2022) | Tight coupling to Russia (energy/trade) exploited as attack vector, limited strategic buffers |
+| **1** | Lebanon | Sectarian power-sharing creates total gridlock coupling, any subsystem failure cascades everywhere |
+
 ---
 
 ## Dimension 7: Power Topology
+
+### Public Company
 
 | Score | Anchor Case | Observable Characteristics |
 |-------|------------|---------------------------|
@@ -86,6 +160,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **3** | Meta/Facebook (ongoing) | Dual-class shares give Zuckerberg permanent control, board limited, but professional management layer operates effectively day-to-day |
 | **2** | WeWork (Neumann era, 2019) | Founder voting supermajority, board captured, no effective checks on decisions until crisis forced removal |
 | **1** | Theranos (Holmes era) | Absolute founder control, board decorative (famous names with no oversight), whistleblowers systematically eliminated |
+
+### Geopolitical
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | United Kingdom | Peaceful power transitions for centuries, effective checks/balances, strong institutional memory |
+| **4** | India | Democratic transitions mostly stable, some institutional strain, judiciary independent but challenged |
+| **3** | Mexico (post-2000) | Democratic transitions established, but cartel power networks create shadow structure alongside state |
+| **2** | Egypt (Sisi era) | Power concentrated in military/presidency, weak checks, succession mechanism unclear |
+| **1** | Libya (post-2011) | Power vacuum, warlord fragmentation, no effective central authority, competing governments |
 
 ---
 
