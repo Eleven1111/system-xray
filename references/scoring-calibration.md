@@ -27,6 +27,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | Pakistan | Contested borders (Kashmir), limited control over tribal areas, weak institutional soft constraints |
 | **1** | Somalia / Yemen | State boundaries on paper only, central power cannot reach territory, no functional soft constraints |
 
+### Government Agency
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | US Federal Reserve | Clear mandate, strong independence, well-defined regulatory boundaries, institutional soft constraints intact |
+| **4** | NHS UK | Clear health mandate, boundary blurring with social care, institutional identity strong |
+| **3** | FDA | Clear mandate but political pressure eroding independence, boundary under strain |
+| **2** | Brazilian IBAMA | Mandate exists but funding/political interference collapsing enforcement |
+| **1** | Soviet Gosplan | Boundary between planning and reality dissolved, mandate purely performative |
+
 ---
 
 ## Dimension 2: Incentive Architecture
@@ -50,6 +60,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **3** | India | Democratic incentives mix with patronage networks, reform incentives weakened by electoral calculus |
 | **2** | Russia (Putin era) | Extractive incentive architecture, loyalty rewarded over competence, sanctions create perverse macro incentives |
 | **1** | North Korea | Total incentive inversion, survival requires loyalty performance, productive output irrelevant |
+
+### Government Agency
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Singapore Civil Service | Meritocratic, competitive pay, low corruption, incentives aligned with national outcomes |
+| **4** | German Bundesbank (pre-ECB) | Strong institutional independence incentives, professional culture dominant |
+| **3** | US VA | Mission-driven but bureaucratic incentives misaligned with patient outcomes |
+| **2** | Russian FSB | Loyalty incentives dominate competence, institutional mission subordinated to regime |
+| **1** | Venezuelan PDVSA (post-2003) | Political loyalty replaced technical competence, production collapsed |
 
 ---
 
@@ -75,6 +95,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | Iran | Dual information system (state vs underground), severe filtering, decision-makers partially disconnected |
 | **1** | Turkmenistan / Eritrea | Near-total information control, decision-makers in complete fantasy world, zero external signal |
 
+### Government Agency
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Singapore public service | Data-driven, rapid feedback, cross-agency sharing, high information velocity |
+| **4** | US CDC (pre-2020) | Strong epidemiological data systems, some political filtering at edges |
+| **3** | FDA (2015-2020) | Expertise strong but increasingly overridden by political signals |
+| **2** | FAA Boeing oversight (2018) | Regulatory capture, self-certification creating blind spots, industry-filtered info |
+| **1** | Soviet Gosplan (late 1980s) | Fabricated data, planners disconnected from reality, zero valid feedback |
+
 ---
 
 ## Dimension 4: Temporal Metabolism
@@ -98,6 +128,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **3** | Brazil | Cyclical between investment and crisis, some long-term plans but political instability disrupts execution |
 | **2** | Argentina | Chronic temporal cannibalism, money printing funds present at expense of future, recurring default cycles |
 | **1** | Venezuela (2015-present) | Consuming all future capacity to fund present crisis, negative optionality, seed corn eaten |
+
+### Government Agency
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | DARPA | Explicit long-horizon R&D mandate, high optionality, accepts project failure as feature |
+| **4** | NIH | Substantial long-term research investment, some short-termism from funding cycles |
+| **3** | NASA (post-Shuttle) | Unclear temporal strategy, oscillating priorities, budget constrained |
+| **2** | UK Probation Service (post-2014) | Outsourcing destroyed institutional knowledge, short-term savings consumed future capacity |
+| **1** | Puerto Rico PREPA | Decades of deferred maintenance until infrastructure collapse |
 
 ---
 
@@ -123,6 +163,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | Myanmar (post-2021) | Military legitimacy rejected by majority, dual governance claim, narrative collapse in progress |
 | **1** | Afghanistan (post-2021) | Taliban narrative rejected by urban population, no unified national story, identity void |
 
+### Government Agency
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | BBC as institution | Strong founding narrative, high public trust, adaptive identity across decades |
+| **4** | US National Park Service | Beloved narrative, some funding tension, institutional resilience and identity strong |
+| **3** | WHO (2020-present) | Legitimacy strained by pandemic response criticism, narrative contested but surviving |
+| **2** | US ICE | Deeply polarized legitimacy, internal identity crisis, mission contested by public |
+| **1** | Iraqi Army (2014, pre-ISIS) | Complete legitimacy collapse, soldiers refused to fight, institution dissolved under pressure |
+
 ---
 
 ## Dimension 6: Coupling Architecture
@@ -147,6 +197,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | Ukraine (pre-2022) | Tight coupling to Russia (energy/trade) exploited as attack vector, limited strategic buffers |
 | **1** | Lebanon | Sectarian power-sharing creates total gridlock coupling, any subsystem failure cascades everywhere |
 
+### Government Agency
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Swiss Federal Council | Collegial with redundancy, cantonal federation provides fault isolation, modular design |
+| **4** | US FEMA (post-Katrina) | Improved modular response capability, still dependent on local capacity |
+| **3** | UK NHS | Tightly coupled nationally, local failure can cascade via shared systems |
+| **2** | Fukushima nuclear regulator (pre-2011) | Tightly coupled to industry, no independent buffer, regulatory capture |
+| **1** | Lebanon EDL power grid | Zero redundancy, zero maintenance, total cascading failure across system |
+
 ---
 
 ## Dimension 7: Power Topology
@@ -170,6 +230,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **3** | Mexico (post-2000) | Democratic transitions established, but cartel power networks create shadow structure alongside state |
 | **2** | Egypt (Sisi era) | Power concentrated in military/presidency, weak checks, succession mechanism unclear |
 | **1** | Libya (post-2011) | Power vacuum, warlord fragmentation, no effective central authority, competing governments |
+
+### Government Agency
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | US Federal Reserve | Institutionalized independence, clear succession, board prevents concentration |
+| **4** | German Constitutional Court | Strong authority, predictable appointments, checks political power effectively |
+| **3** | FBI | Powerful but accountable to DOJ/Congress/courts, independence tension manageable |
+| **2** | Chinese CSRC | Formally independent but subordinate to Party directives, limited real autonomy |
+| **1** | Venezuelan military command | Power in loyalty network, no institutional checks, leader-dependent |
 
 ---
 
