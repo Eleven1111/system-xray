@@ -213,6 +213,34 @@ Before applying the diagnostic framework, build a structural map of the system:
 
 Present this cartography to the user as a structured overview before diving into diagnosis.
 
+### Stage 1.5: Competing Hypotheses Analysis (ACH)
+
+**Position:** After Research Brief (Step 4) confirmation, before dimension diagnosis (Step 5). Skipped in brief mode.
+
+**Purpose:** Force the analyst to consider alternative explanations before committing to a diagnostic frame. Prevents confirmation bias from anchoring on the first plausible narrative.
+
+**Process:**
+
+1. **Hypothesis generation** — Construct 2-4 mutually exclusive hypotheses explaining why the system presents its current state. Hypotheses must be falsifiable, mutually exclusive (or at least partially so), and answer "why" not "what."
+
+2. **Evidence matrix** — Test each key finding and contradiction from the Research Brief against every hypothesis:
+   - **C** (Consistent): Evidence aligns with hypothesis
+   - **I** (Inconsistent): Evidence contradicts hypothesis
+   - **N** (Neutral): Evidence has no discriminating power for this hypothesis
+
+   **Key principle:** One strong I outweighs ten Cs. Most evidence is consistent with multiple hypotheses (shared predictions). What distinguishes hypotheses is inconsistent evidence.
+
+3. **Hypothesis ranking** — Each hypothesis receives a status:
+   - **Active**: Cannot be eliminated by current evidence
+   - **Stressed**: 1-2 I marks, not decisively eliminated
+   - **Eliminated**: Contradicted by strong evidence (specify which)
+
+4. **Injection into diagnosis** — Surviving hypotheses are passed to Stage 2. Each dimension analysis must note how its findings appear under each surviving hypothesis. If a dimension score would differ significantly across hypotheses, report a score range rather than a single number.
+
+**If all hypotheses survive:** This is itself a key finding — the system is in a high-uncertainty state where multiple explanatory models remain viable.
+
+**If no hypotheses survive:** Re-examine the evidence matrix for errors, or generate additional hypotheses.
+
 ### Stage 2: Seven-Dimensional Diagnostic Protocol
 
 **Parallel Execution Architecture**
