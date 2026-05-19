@@ -37,6 +37,36 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | Brazilian IBAMA | Mandate exists but funding/political interference collapsing enforcement |
 | **1** | Soviet Gosplan | Boundary between planning and reality dissolved, mandate purely performative |
 
+### Private Company
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Patagonia (pre-donation) | Clear mission boundary, strong cultural constraints, identity coherent |
+| **4** | SpaceX | Technical focus, boundary discipline despite growth, clear mission demarcation |
+| **3** | Uber (2015-2017) | Aggressive boundary-pushing, soft constraints deteriorating, identity blurring |
+| **2** | Theranos | Boundary between aspiration and reality dissolved, fabricated capabilities |
+| **1** | Wirecard | Boundary fraud, fake subsidiaries, fabricated trust capital |
+
+### Market
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | US Treasury market | Clear regulatory boundaries, deep liquidity, well-defined rules |
+| **4** | EU pharmaceutical/EMA | Harmonized boundary, clear pathways, some national variation |
+| **3** | Global crypto market | Boundaries contested and shifting, regulatory arbitrage rampant |
+| **2** | Chinese shadow banking (2015) | Regulated/unregulated boundary deliberately blurred |
+| **1** | Dark web marketplaces | No enforceable boundaries, regulatory gaps by design |
+
+### Platform
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Linux/Open Source | Clear licensing, well-defined contribution protocols, healthy permeability |
+| **4** | Apple App Store | Clear rules, controlled permeability, developer friction at edges |
+| **3** | YouTube | Content policy boundaries contested and shifting, creator tension |
+| **2** | Facebook (Cambridge Analytica era) | Data boundaries violated, third-party access uncontrolled |
+| **1** | Early ad-tech (pre-GDPR) | No meaningful boundaries, user data extracted without consent |
+
 ---
 
 ## Dimension 2: Incentive Architecture
@@ -70,6 +100,36 @@ Each score level is anchored to observable, verifiable characteristics.
 | **3** | US VA | Mission-driven but bureaucratic incentives misaligned with patient outcomes |
 | **2** | Russian FSB | Loyalty incentives dominate competence, institutional mission subordinated to regime |
 | **1** | Venezuelan PDVSA (post-2003) | Political loyalty replaced technical competence, production collapsed |
+
+### Private Company
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Basecamp/37signals | Flat, profit-sharing aligned with sustainable growth, low agency distance |
+| **4** | Stripe | Strong engineering culture, growth creating some agency distance |
+| **3** | WeWork (2017) | Growth incentives overriding sustainability, misaligned reward signals |
+| **2** | Theranos (2015) | Secrecy/loyalty rewarded, whistleblowers punished, anti-truth incentives |
+| **1** | FTX (private phase) | No separation of interests, customer funds as treasury, total incentive collapse |
+
+### Market
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Danish wind energy | Policy/industry/consumer aligned, positive-sum incentive structure |
+| **4** | Japanese auto industry | Competitive but cooperative keiretsu, supplier alignment functional |
+| **3** | US healthcare | Fee-for-service rewards volume not outcomes, mixed reform progress |
+| **2** | US subprime (2006) | Originate-to-distribute destroyed underwriting incentives |
+| **1** | CDO-squared (2007) | Pure moral hazard, incentives designed to obscure risk |
+
+### Platform
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Wikipedia | Volunteer model aligned with knowledge mission, reputation system works |
+| **4** | Shopify | Merchant success = platform success, alignment strong |
+| **3** | Uber/Lyft | Driver incentive misalignment, surge pricing tension |
+| **2** | Amazon Marketplace | Platform competes with sellers, perverse data advantage |
+| **1** | Facebook (engagement era) | Algorithm rewarded outrage/misinformation, anti-social incentives |
 
 ---
 
@@ -105,6 +165,36 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | FAA Boeing oversight (2018) | Regulatory capture, self-certification creating blind spots, industry-filtered info |
 | **1** | Soviet Gosplan (late 1980s) | Fabricated data, planners disconnected from reality, zero valid feedback |
 
+### Private Company
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Bridgewater | Radical transparency, systematic disagreement, high information velocity |
+| **4** | Valve | Flat structure enables info flow, blind spots from no management layer |
+| **3** | Huawei | Strong R&D info flow, external info constrained by geopolitics |
+| **2** | Theranos | CEO got only filtered positive info, whistleblowers silenced |
+| **1** | Enron (private deals) | SPE structures designed to hide info from board, deliberate opacity |
+
+### Market
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | US equity (post-Reg FD) | Mandatory disclosure, real-time pricing, high symmetry |
+| **4** | UK real estate | Land Registry transparency, some commercial asymmetry |
+| **3** | Global oil | OPEC opacity vs market signals, conflicting information sources |
+| **2** | Chinese property (2021) | Developer health opaque, ratings captured, signals distorted |
+| **1** | Subprime MBS (2007) | Deliberately obscured asset quality, fabricated ratings |
+
+### Platform
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Stack Overflow | Community moderation, high signal-to-noise, reputation surfaces quality |
+| **4** | GitHub | PR/issue system enables info flow, noise in large projects |
+| **3** | Twitter/X | Real-time but declining signal-to-noise, algorithmic distortion |
+| **2** | TikTok | Algorithm creates filter bubbles, environment manipulated |
+| **1** | Facebook (2016 election) | Algorithmic amplification of misinformation, feedback broken |
+
 ---
 
 ## Dimension 4: Temporal Metabolism
@@ -138,6 +228,36 @@ Each score level is anchored to observable, verifiable characteristics.
 | **3** | NASA (post-Shuttle) | Unclear temporal strategy, oscillating priorities, budget constrained |
 | **2** | UK Probation Service (post-2014) | Outsourcing destroyed institutional knowledge, short-term savings consumed future capacity |
 | **1** | Puerto Rico PREPA | Decades of deferred maintenance until infrastructure collapse |
+
+### Private Company
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Koch Industries | Private structure enables decades-long horizons, patient capital deployment |
+| **4** | IKEA/Ingka | Foundation structure enables long-term, systematic refresh cycles |
+| **3** | SoftBank Vision Fund portfolio | Burn rates creating temporal pressure despite long-term thesis |
+| **2** | Vice Media (2018-2022) | Burning capital, renewal theater via pivots, no sustainable model |
+| **1** | Toys "R" Us (LBO) | Debt made future investment impossible, consumed own seed corn |
+
+### Market
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Semiconductor industry | 3-5 year fab cycles, participants accept delayed returns |
+| **4** | Pharma market | 10+ year R&D pipelines, patent system funds temporal investment |
+| **3** | US shale oil | Rapid cycles but boom-bust whiplash, short memory |
+| **2** | Fast fashion | Extreme short-termism, environmental debt, no renewal mechanism |
+| **1** | Subprime (2006-2007) | Entire structure optimized for extraction, zero future capacity |
+
+### Platform
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | AWS | Continuous infrastructure investment, long-term lock-in funds innovation cycle |
+| **4** | Spotify | Investing in diversification despite margin pressure, temporal patience |
+| **3** | Netflix (2022-2023) | Pivoting from growth to profitability mid-stream, temporal reorientation |
+| **2** | Twitter/X (post-acquisition) | Cost-cutting consuming trust capital for short-term savings |
+| **1** | MySpace (2009) | Abandoned by users, zero renewal, total replacement inevitable |
 
 ---
 
@@ -173,6 +293,36 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | US ICE | Deeply polarized legitimacy, internal identity crisis, mission contested by public |
 | **1** | Iraqi Army (2014, pre-ISIS) | Complete legitimacy collapse, soldiers refused to fight, institution dissolved under pressure |
 
+### Private Company
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Patagonia | Mission lived internally/externally, ownership transfer proved it permanently |
+| **4** | SpaceX | Multiplanetary narrative coherent, employees believe it deeply |
+| **3** | OpenAI (2023-2024) | Mission under strain from commercialization, board crisis exposed gap |
+| **2** | WeWork | "Elevate consciousness" disconnected from subletting reality |
+| **1** | Theranos | Narrative fabrication, technology claims were lies, total fraud |
+
+### Market
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Swiss watch industry | Centuries-old craftsmanship narrative, high coherence and belief |
+| **4** | Silicon Valley startup ecosystem | Innovation narrative still compelling, some erosion from scandals |
+| **3** | Crypto/DeFi | Contested legitimacy, believer vs skeptic irreconcilable divide |
+| **2** | Tobacco (2000s) | Public legitimacy collapsed, decades of deception revealed |
+| **1** | Subprime CDO (post-2008) | Total narrative collapse, innovation revealed as fraud |
+
+### Platform
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Wikipedia | Free knowledge narrative deeply believed, internally and externally |
+| **4** | Shopify | "Arm the rebels" narrative resonates, consistent identity |
+| **3** | Meta (2023) | Metaverse narrative mocked, social media narrative tired, seeking identity |
+| **2** | Twitter/X | Narrative crisis, advertiser/user exodus, identity fragmented |
+| **1** | Parler/Truth Social | Niche legitimacy only, mainstream rejection |
+
 ---
 
 ## Dimension 6: Coupling Architecture
@@ -207,6 +357,36 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | Fukushima nuclear regulator (pre-2011) | Tightly coupled to industry, no independent buffer, regulatory capture |
 | **1** | Lebanon EDL power grid | Zero redundancy, zero maintenance, total cascading failure across system |
 
+### Private Company
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Berkshire Hathaway | Decoupled subsidiaries, massive buffers, no contagion between units |
+| **4** | Samsung group | Some cross-subsidiary coupling but diversification provides resilience |
+| **3** | SoftBank Vision Fund | Portfolio semi-independent but shared capital creates coupling |
+| **2** | WeWork (2019) | SoftBank dependency = SPOF, zero financial buffers |
+| **1** | FTX/Alameda | Circular dependencies, customer funds backing related-party trades |
+
+### Market
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Global agricultural commodities | Diversified supply, multiple venues, redundancy built in |
+| **4** | US cloud (AWS/Azure/GCP) | Oligopoly but multi-cloud adoption adds redundancy |
+| **3** | Global semiconductor supply chain | TSMC concentration creates systemic fragility |
+| **2** | Global shipping (Suez dependency) | Single chokepoint, Ever Given proved fragility |
+| **1** | 2008 financial system | Securitization created hidden coupling, cascade propagated globally |
+
+### Platform
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Email protocol | Decentralized, no SPOF, resilient by design |
+| **4** | Cloudflare | Critical infrastructure but redundancy designed in, multiple PoPs |
+| **3** | Apple ecosystem | Tight internal coupling, moderate external supply chain coupling |
+| **2** | AWS for startups | Platform dependency = existential coupling for small companies |
+| **1** | WeChat for Chinese businesses | Total dependency, no alternative, cascade risk |
+
 ---
 
 ## Dimension 7: Power Topology
@@ -240,6 +420,36 @@ Each score level is anchored to observable, verifiable characteristics.
 | **3** | FBI | Powerful but accountable to DOJ/Congress/courts, independence tension manageable |
 | **2** | Chinese CSRC | Formally independent but subordinate to Party directives, limited real autonomy |
 | **1** | Venezuelan military command | Power in loyalty network, no institutional checks, leader-dependent |
+
+### Private Company
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Mondragon cooperative | Democratic governance, elected management, institutionalized power distribution |
+| **4** | Stripe (Collisons) | Founder power with strong board, professional management layer, checks functional |
+| **3** | Meta/Facebook | Dual-class control, board limited, professional operations offset concentration |
+| **2** | WeWork (Neumann era) | Voting supermajority, captured board, no checks until crisis |
+| **1** | Theranos (Holmes era) | Absolute control, decorative board, whistleblowers eliminated |
+
+### Market
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | EU single market governance | Multi-stakeholder, institutional checks, no single dominant entity |
+| **4** | US Fed market influence | Powerful but Congressional oversight, transparent decision-making |
+| **3** | OPEC | Cartel power concentrated but contested, Saudi as swing producer |
+| **2** | De Beers (historical) | Near-monopoly power, artificial scarcity, market manipulation |
+| **1** | Standard Oil (pre-breakup) | Total market power, competitors crushed, regulatory capture |
+
+### Platform
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Linux kernel governance | BDFL + subsystem maintainers, distributed, meritocratic succession |
+| **4** | Ethereum governance | Rough consensus, core devs influential but no single authority |
+| **3** | Apple | Tim Cook holds power with board checks, succession planned |
+| **2** | Meta | Zuckerberg dual-class control, board cannot override |
+| **1** | Twitter/X (post-acquisition) | Single owner, absolute power, no institutional oversight |
 
 ---
 
