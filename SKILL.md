@@ -68,7 +68,7 @@ Orchestrator（你）
   │
   ├─ 综合 Research Brief → 用户确认
   │
-  ├─ 六维分析（基于 Round 1+2 合并信源评分）
+  ├─ 七维分析（基于 Round 1+2 合并信源评分）
   │
   ├─ 生成 3-5 条可证伪预测（Step 5.5）
   │
@@ -91,7 +91,7 @@ Orchestrator（你）
 
 ## ⛔ 前置门控（Orchestrator 开始前必须通过）
 
-进入六维分析前，必须满足：
+进入七维分析前，必须满足：
 - [ ] 所有 Priority 1 视角有至少 1 条有效信源（T1 或 T2）
 - [ ] 矛盾信号已在 Research Brief 中显式标注
 - [ ] Research Brief 已呈现用户并确认
@@ -119,7 +119,7 @@ Orchestrator（你）
 
 报告采用 **Brookings/CSIS 智库长文风格**：叙事散文为主体，行内引用信源，评分嵌入段首。表格/callout 仅在结构化数据确有必要时使用（不是默认容器）。
 
-**完整模式（默认）：** 上期预测复盘（仅有历史预测时）→ 执行摘要（散文）→ 系统制图 → 六维诊断（每维 2-4 段散文）→ 交叉维度 → 风险节点 → 演化情景 → 可证伪预测 → 监控仪表板 → 信源审计（折叠）
+**完整模式（默认）：** 上期预测复盘（仅有历史预测时）→ 执行摘要（散文）→ 系统制图 → 七维诊断（每维 2-4 段散文）→ 交叉维度 → 风险节点 → 演化情景 → 可证伪预测 → 监控仪表板 → 信源审计（折叠）
 
 **精简模式（用户说"精简"/"快速"）：** 执行摘要（散文）→ 三个风险节点 → 三条建议 → 信源审计（不可删）
 
@@ -133,7 +133,7 @@ Orchestrator（你）
 | `{date} {name} 诊断报告.html` | HTML | Brookings/CSIS 智库风格可读报告（含雷达图） | `save_html_report()` |
 | `{date} {name} 系统诊断.md` | MD | Markdown 报告备份 | `save_to_obsidian()` |
 
-HTML 报告使用 `build_radar_svg(scores)` 生成六维雷达图内联 SVG。Orchestrator 负责 MD→HTML 转换，详见 `agent/prompts/system.md` Step 8b。
+HTML 报告使用 `build_radar_svg(scores)` 生成七维雷达图内联 SVG。Orchestrator 负责 MD→HTML 转换，详见 `agent/prompts/system.md` Step 8b。
 
 ---
 
@@ -213,26 +213,27 @@ Before applying the diagnostic framework, build a structural map of the system:
 
 Present this cartography to the user as a structured overview before diving into diagnosis.
 
-### Stage 2: Six-Dimensional Diagnostic Protocol
+### Stage 2: Seven-Dimensional Diagnostic Protocol
 
 **Parallel Execution Architecture**
 
-The six dimensions are analytically independent and should be processed in parallel when sub-agents are available:
+The seven dimensions are analytically independent and should be processed in parallel when sub-agents are available:
 
 ```
 PARALLEL BATCH 1 (launch simultaneously):
   Agent A → Dimension 1: Boundary Topology
   Agent B → Dimension 2: Incentive Architecture
   Agent C → Dimension 3: Information Neurology
+  Agent D → Dimension 4: Temporal Metabolism
 
 PARALLEL BATCH 2 (launch simultaneously):
-  Agent D → Dimension 4: Temporal Metabolism
   Agent E → Dimension 5: Legitimacy & Narrative
   Agent F → Dimension 6: Coupling Architecture
+  Agent G → Dimension 7: Power Topology
 
-SEQUENTIAL (after all 6 complete):
-  Agent G → Cross-Dimensional Interaction Analysis
-             (synthesizes findings from Agents A-F)
+SEQUENTIAL (after all 7 complete):
+  Agent H → Cross-Dimensional Interaction Analysis
+             (synthesizes findings from Agents A-G)
 ```
 
 Each dimension agent receives:
@@ -414,6 +415,36 @@ Each dimension has a **health score** (1-5) and **trajectory** (improving / stab
 
 ---
 
+#### Dimension 7: Power Topology — Authority Distribution & Succession Dynamics
+
+**Core question**: Who can decide what? How is power distributed, how does it flow, and how is it contested?
+
+**Diagnostic checklist:**
+
+| Element | What to examine |
+|---------|----------------|
+| **Formal power structure** | Legal decision-making authority distribution, veto holders, delegation chain length |
+| **Informal power network** | Actual influence centers, behind-the-scenes decision-makers, information brokers |
+| **Coalitions & factions** | Interest alliances' composition, stability, switching costs |
+| **Power transition mechanism** | How institutionalized is succession/election? Was the most recent transition smooth? |
+| **Veto nodes** | Who can unilaterally block system change? Is this blocking power being abused? |
+| **Power-accountability symmetry** | Do those with power bear proportional responsibility? Is power matched with accountability? |
+
+**Key pathology patterns:**
+- *Shadow power structure*: Formal org chart and actual decision-making path severely disconnected
+- *Veto trap*: Too many veto nodes causing institutional sclerosis — the system cannot reform itself
+- *Power vacuum*: Key decision positions effectively unoccupied, system drifts
+- *Winner-take-all cascade*: Power concentration triggers positive feedback — the more power you have, the more you can accumulate
+
+**Health scoring guide:**
+- 5: Appropriate power distribution, effective checks and balances, institutionalized transitions, power-accountability symmetry
+- 4: Moderate power concentration but checks still effective, institutional transitions with occasional tension
+- 3: Partial power concentration with checks under pressure, transitions tense but manageable
+- 2: Significant power concentration or fragmentation, checks exist in name only, transitions unstable
+- 1: Extreme concentration or fragmentation, checks failed, transitions crisis-prone
+
+---
+
 ### Stage 3: Cross-Dimensional Interaction Analysis
 
 After scoring each dimension independently, analyze how they interact. The most dangerous pathologies are always cross-dimensional:
@@ -432,10 +463,13 @@ After scoring each dimension independently, analyze how they interact. The most 
 | **Information-incentive doom loop** | 3×2 | Bad incentives → filtered information → worse decisions → worse incentives |
 | **Legitimacy-coupling cascade** | 5×6 | Legitimacy loss → partners/suppliers decouple → capability loss → more legitimacy loss |
 | **Temporal-boundary squeeze** | 4×1 | Short-term focus → boundary investment deferred → sudden constraint breach |
+| **Power-information doom loop** | 7×3 | Power concentration → information filtering → worse decisions → more power concentration |
+| **Succession-temporal squeeze** | 7×4 | Uncertain succession → everyone shortens time horizon → no long-term investment → system weakens |
+| **Power-legitimacy spiral** | 7×5 | Power grab erodes legitimacy → legitimacy loss triggers power struggle → further power grab |
 
 ### Stage 4: Critical Risk Node Identification
 
-From the six-dimensional analysis and cross-dimensional interactions, identify the **1-3 most critical risk nodes**:
+From the seven-dimensional analysis and cross-dimensional interactions, identify the **1-3 most critical risk nodes**:
 
 For each node:
 1. **Name it precisely** — not vague ("culture problem") but specific ("the incentive structure that rewards regional managers for hiding safety incidents")
@@ -502,14 +536,14 @@ Ask the user which mode they want if not obvious from context.
 1. 执行摘要 (Executive Summary)
    - 系统全息素描 (one paragraph)
    - 核心诊断结论 (3-5 bullet points)
-   - 整体健康评分 (radar chart description across 6 dimensions)
+   - 整体健康评分 (radar chart description across 7 dimensions)
 
 2. 系统制图 (System Cartography)
    - 关键代理人与利益图谱
    - 规则层级（正式/非正式/元规则）
    - 资源流向与价值瓶颈
 
-3. 六维诊断矩阵 (Six-Dimensional Diagnostic Matrix)
+3. 七维诊断矩阵 (Seven-Dimensional Diagnostic Matrix)
    For each dimension:
    - 健康评分: X/5 | 趋势: ↑/→/↓
    - 关键发现 (2-3 bullet points)
@@ -548,8 +582,8 @@ Ask the user which mode they want if not obvious from context.
 
 ## Comparison Mode
 
-If the user asks to compare two systems, use the same six-dimensional framework but present side-by-side:
-- Score each system on all 6 dimensions
+If the user asks to compare two systems, use the same seven-dimensional framework but present side-by-side:
+- Score each system on all 7 dimensions
 - Identify where System A's strength is System B's weakness (and vice versa)
 - Analyze what each system could learn from the other
 - Note where the comparison breaks down (different contexts make direct comparison misleading)
