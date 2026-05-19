@@ -560,6 +560,18 @@ Each prescription must:
 - Name the resistance it will face and from whom
 - **NOT** be generic management advice ("improve communication", "align incentives") — be specific enough that an operator knows exactly what to change on Monday morning
 
+Each prescription must also include **propagation annotation**:
+- **Positive spillover**: Which other dimensions will this intervention incidentally improve? Through what mechanism?
+- **Negative spillover**: Which dimensions might this intervention worsen? Is the degradation controllable or structural?
+- **Prescription conflict**: Does this intervention contradict any other prescription? If so, which one and why?
+
+After annotating all prescriptions, perform a **cross-check**:
+1. Aggregate all negative spillovers — is any single dimension being worsened by multiple prescriptions?
+2. Aggregate all conflicts — are there irreconcilable directional contradictions?
+3. If conflicts exist, explain the trade-off rationale in the report ("Prescriptions A and B pull D3 in opposite directions; given D3 is the system leverage point, prioritize A")
+
+**Brief mode:** 3 recommendations still require positive/negative spillover annotation, but skip cross-check.
+
 #### 5.3 Monitoring Dashboard
 
 Suggest 3-5 leading indicators the user should watch to track whether the system is improving or deteriorating. For each indicator:
