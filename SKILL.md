@@ -1,5 +1,5 @@
 ---
-name: system-pathology
+name: system-xray
 description: Deep diagnostic analysis of any structured system (companies, governments, DAOs, ecosystems, markets, platforms) using a multi-dimensional topology framework. Use when user wants to analyze, diagnose, or understand the health, dynamics, risks, or evolution trajectory of any complex organized system. Triggers on requests like "analyze X organization", "diagnose this system", "what's wrong with X", "why is X failing/succeeding", or any request to understand how an organization/system truly works beneath the surface.
 ---
 

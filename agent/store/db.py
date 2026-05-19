@@ -105,11 +105,11 @@ def save_to_obsidian(
     frontmatter = f"""---
 title: "{system_name} 系统诊断报告"
 date: {date_str}
-type: system-pathology
+type: system-xray
 system: "{system_name}"
 system_type: "{system_type}"
 tags:
-  - system-pathology
+  - system-xray
   - {system_type}
 ---
 
@@ -154,7 +154,7 @@ def save_research_materials(
         f'system: "{system_name}"',
         f'system_type: "{system_type}"',
         'tags:',
-        '  - system-pathology',
+        '  - system-xray',
         '  - research-materials',
         f'  - {system_type}',
         '---',

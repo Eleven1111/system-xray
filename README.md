@@ -114,7 +114,7 @@ On repeat analysis of the same system, prior predictions are automatically loade
 ## Directory Structure
 
 ```
-system-pathology/
+system-xray/
 ├── SKILL.md                              # Skill metadata + full diagnostic protocol
 ├── agent/
 │   ├── agent.py                          # CLI entry point (query preview, history)
@@ -151,7 +151,7 @@ This is a Claude Code skill — it runs inside Claude Code's agent infrastructur
 1. Clone this repo into your Claude Code skills directory:
 
 ```bash
-git clone https://github.com/Eleven1111/system-pathology.git ~/.claude/skills/system-pathology
+git clone https://github.com/Eleven1111/system-xray.git ~/.claude/skills/system-xray
 ```
 
 2. The skill auto-registers via `SKILL.md` frontmatter. No `pip install` needed — all Python tools use only the standard library.
@@ -182,7 +182,7 @@ The skill triggers automatically on system-analysis requests. You can also speci
 ### CLI Preview (for query debugging)
 
 ```bash
-cd ~/.claude/skills/system-pathology
+cd ~/.claude/skills/system-xray
 python3 -m agent.agent --system "ByteDance" --type public_company --queries-only
 python3 -m agent.agent --system "ByteDance" --history
 python3 -m agent.agent --list-types

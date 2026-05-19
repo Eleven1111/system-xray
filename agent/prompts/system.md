@@ -19,7 +19,7 @@
 ### Step 1 — 调用工具获取查询集
 
 ```bash
-cd /Users/na/.claude/skills/system-pathology
+cd /Users/na/.claude/skills/system-xray
 python3 -c "
 import json, sys
 sys.path.insert(0, '.')
@@ -214,7 +214,7 @@ Agent(
 
 **前置检查：**
 ```bash
-cd /Users/na/.claude/skills/system-pathology
+cd /Users/na/.claude/skills/system-xray
 python3 -c "
 import json, sys
 sys.path.insert(0, '.')
@@ -343,7 +343,7 @@ Agent(
 ### Step 6 — 历史对比（如有历史记录）
 
 ```bash
-cd /Users/na/.claude/skills/system-pathology
+cd /Users/na/.claude/skills/system-xray
 python3 -c "
 import json, sys
 sys.path.insert(0, '.')
@@ -360,7 +360,7 @@ print(json.dumps(data, ensure_ascii=False, indent=2) if data else 'null')
 ### Step 7 — 持久化结果（JSON）
 
 ```bash
-cd /Users/na/.claude/skills/system-pathology
+cd /Users/na/.claude/skills/system-xray
 python3 -c "
 import json, sys
 sys.path.insert(0, '.')
@@ -384,7 +384,7 @@ print(f'已保存到：{path}')
 将 Step 4 的 Research Brief（含完整 sources、contradictions、coverage gaps）保存为 MD：
 
 ```bash
-cd /Users/na/.claude/skills/system-pathology
+cd /Users/na/.claude/skills/system-xray
 python3 -c "
 import json, sys
 sys.path.insert(0, '.')
@@ -415,7 +415,7 @@ print(f'素材已保存到：{path}')
 将 Step 5 生成的报告转换为 HTML 片段，然后调用 `save_html_report`：
 
 ```bash
-cd /Users/na/.claude/skills/system-pathology
+cd /Users/na/.claude/skills/system-xray
 python3 -c "
 import sys
 sys.path.insert(0, '.')
@@ -446,7 +446,7 @@ print(f'HTML 报告已保存到：{path}')
 **雷达图生成（必须调用 helper，不得手写 SVG）：**
 
 ```bash
-cd /Users/na/.claude/skills/system-pathology
+cd /Users/na/.claude/skills/system-xray
 python3 -c "
 import sys
 sys.path.insert(0, '.')
@@ -463,7 +463,7 @@ print(svg)
 #### Step 8c — 同时保存 Markdown 备份到 Obsidian
 
 ```bash
-cd /Users/na/.claude/skills/system-pathology
+cd /Users/na/.claude/skills/system-xray
 python3 -c "
 import sys
 sys.path.insert(0, '.')
