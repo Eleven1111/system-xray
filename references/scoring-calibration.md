@@ -77,6 +77,18 @@ Each score level is anchored to observable, verifiable characteristics.
 
 ---
 
+## Dimension 7: Power Topology
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Berkshire Hathaway (succession plan) | Decades-long planned transition from Buffett to Abel, decentralized subsidiary autonomy, board with real authority, transparent succession process |
+| **4** | Microsoft (Nadella era) | Smooth Ballmer→Nadella transition, board exercised genuine selection, leadership refreshed culture without power struggle |
+| **3** | Meta/Facebook (ongoing) | Dual-class shares give Zuckerberg permanent control, board limited, but professional management layer operates effectively day-to-day |
+| **2** | WeWork (Neumann era, 2019) | Founder voting supermajority, board captured, no effective checks on decisions until crisis forced removal |
+| **1** | Theranos (Holmes era) | Absolute founder control, board decorative (famous names with no oversight), whistleblowers systematically eliminated |
+
+---
+
 ## Cross-Reference: When Scores Interact
 
 **High-confidence danger zones** (patterns that reliably predict catastrophic failure):
@@ -87,6 +99,8 @@ Each score level is anchored to observable, verifiable characteristics.
 | Information-boundary dysfunction | D3≤2 + D1≤2 | Soviet enterprises, Wirecard |
 | Temporal-coupling catastrophe | D4≤2 + D6≤2 | Toys R Us, heavily LBO'd retailers |
 | Narrative-feedback death spiral | D5≤2 + D3≤2 | WeWork, many unicorn busts |
+| Power-information doom loop | D7≤2 + D3≤2 | Theranos, North Korea, late-era GE |
+| Succession crisis cascade | D7≤2 + D4≤2 | Family businesses without succession, post-founder startups |
 
 **High-confidence survival zone** (systems that can absorb significant shocks):
 
@@ -95,6 +109,7 @@ Each score level is anchored to observable, verifiable characteristics.
 | Anti-fragile core | D4≥4 + D6≥4 |
 | Trust-information flywheel | D5≥4 + D3≥4 |
 | Incentive-boundary alignment | D2≥4 + D1≥4 |
+| Power-accountability balance | D7≥4 + D2≥4 |
 
 ---
 
@@ -105,3 +120,5 @@ Each score level is anchored to observable, verifiable characteristics.
 3. **Trajectory matters as much as score**: A system at 3/5 declining is more dangerous than a system at 2/5 improving
 4. **Calibrate to sector norms when relevant**: A 3/5 for information quality in a fast-moving startup is different from a 3/5 in a nuclear power plant
 5. **Never score above 4 without specific evidence**: 5/5 is for exemplars only, not "seems fine"
+6. **Cross-type scores are not equivalent**: A 3/5 for a geopolitical system and a 3/5 for a public company reflect mid-range health within their respective scoring tracks, not identical conditions
+7. **Anchor cases can appear across types**: The same entity (e.g., Singapore) may anchor different scores in different system_type tracks, evaluated independently
