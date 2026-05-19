@@ -8,7 +8,7 @@
 
 | 角色 | 职责 |
 |------|------|
-| **你（Orchestrator）** | 调用工具、派发 Researcher sub-agents、综合结果、执行六维分析、生成报告 |
+| **你（Orchestrator）** | 调用工具、派发 Researcher sub-agents、综合结果、执行七维分析、生成报告 |
 | **Researcher sub-agents** | 执行 WebSearch、采集原始证据、识别矛盾信号、返回结构化 JSON |
 | **Python 工具层** | 生成查询集、持久化结果、历史对比（纯计算，通过 Bash 调用） |
 
@@ -296,26 +296,37 @@ Agent(
 
 ---
 
-### Step 5 — 六维分析
+### Step 5 — 七维分析
 
-读取 `references/scoring-calibration.md` 中的锚点案例后，执行六维诊断。
+读取 `references/scoring-calibration.md` 中的锚点案例后，执行七维诊断。
 
 每个维度评分规则：
 - 评分（1-5）必须对应至少 1 条 T1 或T2 信源（来自 Researcher 结果）
 - 格式：`评分: X/5 [↑/→/↓] | 依据：{信源标题} ({T级别})`
 - 训练知识只能作为背景补充，标注 `⚠️ 训练知识`
 
+**维度内预测产出规则：**
+
+每个维度分析结束后，Orchestrator 评估是否产出该维度的候选预测：
+- 如果该维度评分稳定（3-4 分，趋势 →）且无显著风险信号：不出预测
+- 如果该维度有明确的恶化/改善趋势或关键转折点：产出 1 条候选预测
+- 候选预测必须从该维度的诊断结论自然导出，不是事后编造
+- 候选预测使用与最终预测相同的 JSON 格式，增加 `"source_step": "dimension_analysis"` 字段
+
+暂存所有候选预测，在 Step 5.5 统一筛选。
+
 ---
 
-### Step 5.5 — 生成可证伪预测
+### Step 5.5 — 预测汇编（从候选中筛选）
 
-从六维诊断结论和交叉维度分析中，提炼 3-5 条**可证伪预测**。每条预测必须：
-- 有明确的时间窗口（绝对日期，如 `2027-03-31`，不是"6 个月内"）
-- 有具体的证伪条件（如果观察到 X 则预测失败）
-- 链接到具体维度（D1-D6）
-- 有数值置信度（0.0-1.0）
+1. 收集 Step 5（维度内）和 Step 5.2（跨维度）产出的全部候选预测
+2. 筛选最有诊断价值的 **3-5 条**，标准：
+   - 覆盖至少 3 个不同维度
+   - 包含高置信（≥0.8）和低置信（≤0.3）的分布
+   - 优先保留 `source_step: "cross_dimensional"` 的预测
+3. 被筛掉的候选预测保存在 `candidate_predictions` 字段
+4. 最终预测 JSON 格式（新增 `source_step`）：
 
-**预测 JSON 格式：**
 ```json
 [
   {
@@ -325,7 +336,8 @@ Agent(
     "trigger_indicator": "需要监控的先行指标",
     "confidence": 0.7,
     "dimension_link": "D2",
-    "conditional_update": "如果 [条件] 发生，置信度调整为 [新值]"
+    "conditional_update": "如果 [条件] 发生，置信度调整为 [新值]",
+    "source_step": "dimension_analysis|cross_dimensional"
   }
 ]
 ```
@@ -408,7 +420,7 @@ print(f'素材已保存到：{path}')
 **首先生成报告标题。** 标题必须是智库/杂志风格的编辑标题，不是干巴巴的系统名称。规则：
 
 - 用隐喻、判断或核心矛盾做主标题（冒号前），用具体对象和时间窗口做副标题（冒号后）
-- 好标题示例：「北京共识的脆弱骨架：特朗普访华后的中美关系结构性评估」「失速的独角兽：ByteDance 增长引擎的六维解剖」「安静的崩塌：日本央行退出 YCC 后的系统性风险地图」
+- 好标题示例：「北京共识的脆弱骨架：特朗普访华后的中美关系结构性评估」「失速的独角兽：ByteDance 增长引擎的七维解剖」「安静的崩塌：日本央行退出 YCC 后的系统性风险地图」
 - 坏标题示例：「中美关系系统诊断报告」「ByteDance — 系统诊断报告」（禁止使用这类模板化标题）
 - 标题从诊断结论中提炼，必须在分析完成后才能确定，不能提前拟定
 
@@ -439,7 +451,7 @@ print(f'HTML 报告已保存到：{path}')
 | 维度评分 N/5 | `<span class="score-badge score-N">N/5</span>` |
 | 表格 | `<table><thead>...<tbody>...`（自动 zebra stripe） |
 | 信源审计 | `<details><summary>信源审计（点击展开）</summary><div class="content">...</div></details>` |
-| 六维雷达图 | `<div class="radar-container">` + 调用 `build_radar_svg()` 生成 |
+| 七维雷达图 | `<div class="radar-container">` + 调用 `build_radar_svg()` 生成 |
 | 上期预测复盘（仅当 Step 3.6 有结果时） | `<div class="prediction-review"><h2>上期预测复盘</h2>` + 每条预测用 `<div class="callout callout-green/callout-red/callout-amber">` 包裹（✅confirmed=green, ❌falsified=red, ⏳pending=amber），内含原始预测、证据摘要、校准分数 |
 | 可证伪预测 | `<div class="predictions"><h2>可证伪预测</h2>` + 每条预测用 `<div class="prediction-card"><div class="prediction-title">{prediction}</div><div class="prediction-meta">证伪条件：{falsification_condition} ｜ 时间窗口：{time_horizon} ｜ 置信度：{confidence}</div><div class="prediction-link">关联维度：{dimension_link}</div></div>` |
 
@@ -456,7 +468,7 @@ print(svg)
 "
 ```
 
-将 `{'D1': 3, ...}` 替换为实际六维评分。返回的 SVG 字符串直接嵌入 `<div class="radar-container">...</div>` 中。
+将 `{'D1': 3, ...}` 替换为实际七维评分。返回的 SVG 字符串直接嵌入 `<div class="radar-container">...</div>` 中。
 
 ---
 
@@ -513,7 +525,7 @@ System Pathology/
 7. **信源审计独立折叠**：用 `<details><summary>` 放在报告末尾，完整列出所有信源，按 Tier 分组。
 
 **完整模式（默认）：**
-上期预测复盘（仅当有历史预测验证结果时） → 执行摘要（散文） → 系统制图（散文 + 资源流图） → 六维诊断（每维 2-4 段散文 + 行内评分） → 交叉维度分析（散文 + 必要时用表格） → 关键风险节点（散文） → 演化情景与干预处方（散文 + 情景概率表） → 可证伪预测 → 监控仪表板（表格） → 信源审计（折叠）
+上期预测复盘（仅当有历史预测验证结果时） → 执行摘要（散文） → 系统制图（散文 + 资源流图） → 七维诊断（每维 2-4 段散文 + 行内评分） → 交叉维度分析（散文 + 必要时用表格） → 关键风险节点（散文） → 演化情景与干预处方（散文 + 情景概率表） → 可证伪预测 → 监控仪表板（表格） → 信源审计（折叠）
 
 **精简模式（用户说"精简"/"快速"）：**
 执行摘要（散文） → 三个关键风险节点（散文，每节 1-2 段） → 三条干预建议（散文） → 信源审计（折叠）

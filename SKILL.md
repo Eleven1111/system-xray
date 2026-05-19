@@ -590,12 +590,22 @@ If the user asks to compare two systems, use the same seven-dimensional framewor
 
 ## 预测与校准系统
 
-每次分析在 Step 5.5 生成 3-5 条**可证伪预测**，保存在 analysis JSON 的 `predictions` 字段中。
+预测采用**分布式产出 + 综合筛选**模式：
+
+1. **维度内预测（Step 5）**：每个维度分析结束时，Orchestrator 产出 0-1 条该维度的候选预测。评分稳定（3-4 分，趋势 →）且无显著风险时可不出预测；有明确恶化/改善趋势或关键转折点时必须出 1 条。
+
+2. **跨维度预测（Step 5.2）**：跨维度交互分析完成后，额外产出 1-2 条涉及反馈回路或级联效应的预测。
+
+3. **预测汇编（Step 5.5）**：收集全部候选预测（预期 4-9 条），筛选最终 3-5 条：
+   - 覆盖至少 3 个不同维度
+   - 包含高置信（≥0.8）和低置信（≤0.3）的分布
+   - 优先保留跨维度预测（诊断价值更高）
+   - 被筛掉的候选存入 JSON `candidate_predictions` 字段备查
 
 当对同一系统进行重复分析时（Step 3.6），自动加载上次预测并派发 `prediction_verification` Researcher 验证。验证结果通过 `calculate_prediction_accuracy()` 计算校准分数（Brier score），在 Research Brief 中展示。
 
 **预测要求：**
-- 必填字段：`prediction`、`falsification_condition`（required）、`time_horizon`（绝对日期）、`confidence`（0.0-1.0）、`dimension_link`（D1-D6）
+- 必填字段：`prediction`、`falsification_condition`（required）、`time_horizon`（绝对日期）、`confidence`（0.0-1.0）、`dimension_link`（D1-D7）、`source_step`（`dimension_analysis` | `cross_dimensional`）
 - 禁止模糊预测和必然预测——必须可观察、可证伪
 - 高置信（≥0.8）预测落空会被 `high_confidence_misses` 标记为特别警示
 
