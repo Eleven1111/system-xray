@@ -31,7 +31,7 @@ This skill has an `agent/` directory with full orchestrator-subagent infrastruct
 - `agent/prompts/system.md` — **Orchestrator** 提示词（调用工具、派发 Researcher、综合分析）
 - `agent/prompts/researcher.md` — **Researcher sub-agent** 提示词（标准采集 + 4 种 Round 2 模式：gap_filler / contradiction_resolution / data_anchor / prediction_verification）
 - `agent/tools/query_generator.py` — 生成多视角查询集 + 并行批次分组（纯计算）
-- `agent/tools/history_compare.py` — 跨期维度评分对比 + 预测校准分数计算（纯计算）
+- `agent/tools/history_compare.py` — 跨期维度评分对比 + 预测校准分数计算 + 历史类比匹配（纯计算）
 - `agent/store/db.py` — 持久化（JSON + MD素材 + HTML智库报告 + 雷达图SVG + 预测加载）
 - `agent/agent.py` — CLI 辅助工具（查询集预览、历史记录查看）
 
@@ -72,7 +72,7 @@ Orchestrator（你）
   │
   ├─ 生成 3-5 条可证伪预测（Step 5.5）
   │
-  ├─ Bash: history_compare() + calculate_prediction_accuracy()
+  ├─ Bash: history_compare() + find_analogies() + calculate_prediction_accuracy()
   │
   └─ Bash: save_analysis(含 predictions)  ← 持久化
 ```
@@ -521,6 +521,27 @@ Compare discovered interactions against the known pattern library below. If a di
 | **Power-legitimacy spiral** | 7×5 | Power grab erodes legitimacy → legitimacy loss triggers power struggle → further power grab |
 
 The known pattern library is an aid for naming, not a constraint on discovery. Always run Steps 3a-3c first.
+
+### Stage 3.5: Historical Analogy Matching
+
+After scoring all seven dimensions, match the current system's score vector against 43 historical reference cases using cosine similarity. This provides structural analogies — systems that "looked like this" in the past — to contextualize the diagnosis.
+
+**Tool:** `agent/tools/history_compare.py` → `find_analogies(scores, system_type, top_k=3)`
+
+**How it works:**
+- Computes cosine similarity between the current 7-dimensional score vector and each historical case
+- Same system_type cases receive a 1.2x similarity boost (a failing company resembles other failing companies more than failing states)
+- Returns top-k results with: similarity score, case name, outcome, key lesson, score vector
+
+**Historical case library:** `references/analogy-cases.json` — 43 cases across 6 system types (geopolitical, public_company, private_company, government_agency, market, platform)
+
+**Interpretation rules:**
+- Analogies are heuristic, not predictive — "structurally similar to X" does not mean "will follow X's trajectory"
+- Always highlight key differences between the current system and the analogy (which dimensions diverge, and why those differences matter)
+- If top-3 analogies all share the same outcome direction (e.g., all collapsed), flag this as a structural warning signal
+- Present in the report between cross-dimensional analysis and risk node identification
+
+---
 
 ### Stage 4: Critical Risk Node Identification
 

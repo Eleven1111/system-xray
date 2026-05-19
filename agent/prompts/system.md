@@ -396,6 +396,49 @@ H2: ...
 
 ---
 
+### Step 5.3 — 历史类比匹配
+
+基于七维评分向量，在 43 个历史案例库中查找结构性相似系统。
+
+```bash
+cd /Users/na/.claude/skills/system-xray
+python3 -c "
+import json, sys
+sys.path.insert(0, '.')
+from agent.tools.history_compare import find_analogies
+scores = DIMENSION_SCORES_DICT
+results = find_analogies(scores, system_type='SYSTEM_TYPE', top_k=3)
+print(json.dumps(results, ensure_ascii=False, indent=2))
+"
+```
+
+将 `DIMENSION_SCORES_DICT`（如 `{'D1': 3, 'D2': 4, ...}`）和 `SYSTEM_TYPE` 替换为实际值。
+
+**结果处理：**
+- 每条结果包含：`similarity`（余弦相似度）、`name`、`outcome`、`key_lesson`、`scores`
+- 同类型系统有 1.2x 相似度 boost
+- 在报告中呈现 Top 3 类比，格式：
+
+```
+## 历史类比
+当前系统的七维评分向量与以下历史案例最为相似：
+
+1. **{name}** ({time_snapshot}) — 相似度 {similarity}
+   结局：{outcome}
+   关键教训：{key_lesson}
+   评分对比：[当前系统 vs 类比案例的关键差异维度]
+
+2. ...
+3. ...
+```
+
+**使用原则：**
+- 类比是启发工具，不是预测工具——"X 与 Y 相似"不等于"X 会重蹈 Y 覆辙"
+- 必须指出当前系统与类比案例的关键差异（哪些维度评分不同，为什么这些差异可能导致不同结局）
+- 如果 Top 3 类比的结局方向一致（如都以失败告终），这是一个强警告信号
+
+---
+
 ### Step 5.5 — 预测汇编（从候选中筛选）
 
 1. 收集 Step 5（维度内）和 Step 5.2（跨维度）产出的全部候选预测
