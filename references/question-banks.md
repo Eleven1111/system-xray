@@ -131,6 +131,25 @@ Mark each answer as:
 
 ---
 
+## Dimension 7: Power Topology
+
+### Formal Power Questions
+1. Who actually makes the decisions that matter most? Is it the person whose title says they should?
+2. Are there formal veto points in the decision-making process? Who holds them, and do they use them constructively or obstructively?
+3. How many layers of approval does a significant decision require? Has that changed recently?
+
+### Informal Power Questions
+4. Who are the people that others go to when they need something done — regardless of those people's formal roles?
+5. Are there factions or coalitions that form around competing visions or interests? How stable are they?
+6. Is there a gap between the org chart and how things actually work? How big is that gap?
+
+### Power Transition Questions
+7. How was the current leader selected? Was it contested, smooth, or imposed?
+8. Is there a clear succession plan? If the top person left tomorrow, would the transition be orderly or chaotic?
+9. Has a power transition happened in the last 5 years? What did it reveal about the system's institutional health?
+
+---
+
 ## Cross-Cutting Questions (Ask for any system)
 
 These questions often reveal the most critical insights:
@@ -150,7 +169,7 @@ These questions often reveal the most critical insights:
 | Situation | Priority questions |
 |-----------|-------------------|
 | User is insider (employee, exec) | All 7 cross-cutting + dimensions most relevant to presenting problem |
-| User is investor/board member | D2 (incentives), D4 (temporal), D3 (information) + cross-cutting |
+| User is investor/board member | D2 (incentives), D4 (temporal), D3 (information), D7 (power) + cross-cutting |
 | User is competitor/market analyst | D1 (boundary), D5 (legitimacy), D6 (coupling) + public research |
 | User has no insider access | Skip interview questions; rely on research protocol + visible signals |
-| Crisis/urgent situation | Ticking clock + D3 + D6 questions first, then full analysis |
+| Crisis/urgent situation | Ticking clock + D3 + D6 + D7 questions first, then full analysis |
