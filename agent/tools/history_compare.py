@@ -1,11 +1,19 @@
 """
-Tool: 历史对比 + 预测校准（纯计算）
+Tool: 历史对比 + 预测校准 + 历史类比匹配（纯计算）
 
 比较同一系统的两次分析，输出各维度评分变化和趋势警告。
 计算历史预测的校准分数（Brier score）。
+基于七维评分向量进行历史类比匹配（余弦相似度）。
 """
 
+import json
+import math
+from pathlib import Path
+
 from agent.store.db import load_latest
+
+_CASES_PATH = Path(__file__).resolve().parent.parent.parent / 'references' / 'analogy-cases.json'
+_CASES_CACHE: list[dict] | None = None
 
 DIMENSION_LABELS = {
     'D1': '边界拓扑',
@@ -187,3 +195,45 @@ def calculate_prediction_accuracy(verification_results: list[dict]) -> dict:
         'high_confidence_misses': high_conf_misses,
         'summary': summary,
     }
+
+
+def _load_cases() -> list[dict]:
+    global _CASES_CACHE
+    if _CASES_CACHE is None:
+        _CASES_CACHE = json.loads(_CASES_PATH.read_text(encoding='utf-8'))
+    return _CASES_CACHE
+
+
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    mag_a = math.sqrt(sum(x * x for x in a))
+    mag_b = math.sqrt(sum(x * x for x in b))
+    if mag_a == 0 or mag_b == 0:
+        return 0.0
+    return dot / (mag_a * mag_b)
+
+
+def find_analogies(current_scores: dict, system_type: str | None = None, top_k: int = 3) -> list[dict]:
+    cases = _load_cases()
+    dim_keys = sorted(current_scores.keys())
+    current_vec = [current_scores.get(k, 0) for k in dim_keys]
+
+    scored = []
+    for case in cases:
+        case_vec = [case['scores'].get(k, 0) for k in dim_keys]
+        sim = _cosine_similarity(current_vec, case_vec)
+        if system_type and case.get('system_type') == system_type:
+            sim *= 1.2
+        sim = min(sim, 1.0)
+        scored.append({
+            'similarity': round(sim, 4),
+            'name': case['name'],
+            'system_type': case['system_type'],
+            'time_snapshot': case.get('time_snapshot', ''),
+            'scores': case['scores'],
+            'outcome': case['outcome'],
+            'key_lesson': case['key_lesson'],
+        })
+
+    scored.sort(key=lambda x: x['similarity'], reverse=True)
+    return scored[:top_k]
