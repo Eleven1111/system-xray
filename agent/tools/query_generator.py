@@ -45,6 +45,7 @@ PERSPECTIVE_MATRIX = {
         ('economic_indicators', 2, 2, '{name} economy OR currency OR sanctions OR GDP {prev_year} OR {year}'),
         ('military_security',   3, 2, '{name} military OR security OR conflict OR ceasefire {prev_year} OR {year}'),
         ('civil_society',       3, 3, '{name} civil society OR NGO OR human rights {prev_year} OR {year}'),
+        ('power_structure',     2, 1, '{name} leadership succession OR power struggle OR elite faction OR coup {prev_year} OR {year}'),
     ],
     'government_agency': [
         ('accountability',      1, 1, '{name} inspector general OR audit report OR GAO {prev_year} OR {year}'),
@@ -53,6 +54,7 @@ PERSPECTIVE_MATRIX = {
         ('employee_morale',     3, 2, '{name} employee morale OR union grievance OR turnover {prev_year} OR {year}'),
         ('public_trust',        2, 2, '{name} public trust OR polling OR survey OR criticism {prev_year} OR {year}'),
         ('capture',             3, 3, '{name} revolving door OR industry capture OR conflict of interest {prev_year} OR {year}'),
+        ('power_dynamics',      2, 1, '{name} leadership turnover OR political appointee OR institutional independence {prev_year} OR {year}'),
     ],
     'public_company': [
         ('financial',           1, 1, '{name} annual report OR 10-K OR earnings {prev_year} OR {year}'),
@@ -63,6 +65,7 @@ PERSPECTIVE_MATRIX = {
         ('employee',            3, 2, '{name} employee review OR culture OR CEO approval {prev_year} OR {year}'),
         ('customer',            2, 2, '{name} product recall OR customer complaint OR NPS {prev_year} OR {year}'),
         ('insider',             1, 2, '{name} insider selling OR buyback OR proxy statement {prev_year} OR {year}'),
+        ('governance_power',    2, 1, '{name} board shake-up OR activist investor proxy OR CEO power OR dual-class {prev_year} OR {year}'),
     ],
     'private_company': [
         ('funding',             1, 1, '{name} funding round OR valuation OR Crunchbase {prev_year} OR {year}'),
@@ -71,6 +74,7 @@ PERSPECTIVE_MATRIX = {
         ('employee',            3, 2, '{name} Glassdoor OR hiring freeze OR layoffs {prev_year} OR {year}'),
         ('competitor',          2, 2, '{name} vs competitor OR market position {prev_year} OR {year}'),
         ('legal',               1, 2, '{name} lawsuit OR legal dispute OR breach of contract {prev_year} OR {year}'),
+        ('founder_power',       2, 1, '{name} founder control OR board governance OR co-founder power struggle {prev_year} OR {year}'),
     ],
     'dao': [
         ('governance',          1, 1, '{name} governance proposal OR vote OR treasury {prev_year} OR {year}'),
@@ -79,6 +83,7 @@ PERSPECTIVE_MATRIX = {
         ('tokenomics',          2, 2, '{name} TVL OR token price OR liquidity OR tokenomics {prev_year} OR {year}'),
         ('development',         2, 2, '{name} GitHub contributors OR development activity {prev_year} OR {year}'),
         ('criticism',           3, 2, '{name} criticism OR FUD OR regulatory risk {prev_year} OR {year}'),
+        ('governance_power',    1, 1, '{name} governance centralization OR multisig power OR whale voting OR delegate {prev_year} OR {year}'),
     ],
     'market': [
         ('structure',           2, 1, '{name} industry consolidation OR fragmentation OR M&A {prev_year} OR {year}'),
@@ -87,6 +92,7 @@ PERSPECTIVE_MATRIX = {
         ('competition',         2, 2, '{name} market share OR dominant player OR pricing power {prev_year} OR {year}'),
         ('capital',             2, 2, '{name} investment OR PE activity OR funding {prev_year} OR {year}'),
         ('demand',              3, 3, '{name} consumer sentiment OR demand trend OR adoption {prev_year} OR {year}'),
+        ('market_power',        2, 2, '{name} monopoly OR market concentration OR antitrust OR dominant player power {prev_year} OR {year}'),
     ],
     'platform': [
         ('ecosystem',           2, 1, '{name} developer OR API OR third-party policy change {prev_year} OR {year}'),
@@ -95,6 +101,7 @@ PERSPECTIVE_MATRIX = {
         ('competition',         2, 2, '{name} competitor OR alternative OR multi-homing {prev_year} OR {year}'),
         ('trust',               2, 2, '{name} quality degradation OR spam OR trust issue {prev_year} OR {year}'),
         ('network',             3, 3, '{name} network effects OR user growth OR churn {prev_year} OR {year}'),
+        ('platform_power',      2, 1, '{name} platform governance OR unilateral policy change OR creator power OR union {prev_year} OR {year}'),
     ],
 }
 
@@ -107,20 +114,24 @@ CHINESE_PERSPECTIVES = {
         ('zh_quality_media',   2, 1, '{name} site:caixin.com OR site:thepaper.cn OR site:ftchinese.com {prev_year} OR {year}'),
         ('zh_think_tank',      2, 1, '{name} 智库 OR 研究院 OR 政策分析 site:cssn.cn OR site:ciis.org.cn OR 中国社科院 {prev_year} OR {year}'),
         ('zh_social_signal',   3, 3, '{name} site:weibo.com OR site:zhihu.com 舆论 OR 评论 OR 讨论 {prev_year} OR {year}'),
+        ('zh_power_dynamics',  2, 1, '{name} 权力交接 OR 派系 OR 继承 OR 人事变动 site:caixin.com OR site:thepaper.cn {prev_year} OR {year}'),
     ],
     'government_agency': [
         ('zh_official_docs',   1, 1, '{name} 政府文件 OR 通知 OR 公告 site:gov.cn {prev_year} OR {year}'),
         ('zh_media_coverage',  2, 1, '{name} site:caixin.com OR site:thepaper.cn 改革 OR 问责 OR 审计 {prev_year} OR {year}'),
         ('zh_public_opinion',  3, 2, '{name} 群众 OR 投诉 OR 效率 OR 满意度 site:weibo.com OR site:zhihu.com {prev_year} OR {year}'),
+        ('zh_agency_power',    2, 2, '{name} 领导班子 OR 人事调整 OR 机构改革 site:gov.cn OR site:thepaper.cn {prev_year} OR {year}'),
     ],
     'public_company': [
         ('zh_financial_media', 2, 1, '{name} site:caixin.com OR site:yicai.com OR site:cls.cn 财报 OR 业绩 OR 营收 {prev_year} OR {year}'),
         ('zh_regulatory',      1, 1, '{name} site:csrc.gov.cn OR 证监会 OR 交易所 处罚 OR 问询 OR 监管 {prev_year} OR {year}'),
         ('zh_employee_signal', 3, 2, '{name} site:maimai.cn OR 脉脉 OR 知乎 裁员 OR 加班 OR 内部 {prev_year} OR {year}'),
+        ('zh_corp_governance', 2, 2, '{name} 控制权 OR 董事会 OR 股东大会 OR 创始人 site:caixin.com OR site:cls.cn {prev_year} OR {year}'),
     ],
     'private_company': [
         ('zh_tech_media',      2, 1, '{name} site:36kr.com OR site:latepost.com OR site:jiemian.com 融资 OR 裁员 OR 业务 {prev_year} OR {year}'),
         ('zh_employee_signal', 3, 2, '{name} site:maimai.cn OR 脉脉 OR 知乎 工作体验 OR 离职 OR 内部 {prev_year} OR {year}'),
+        ('zh_founder_power',   2, 2, '{name} 创始人 OR 管理层变动 OR 控制权 site:36kr.com OR site:latepost.com {prev_year} OR {year}'),
     ],
     'market': [
         ('zh_industry_report', 2, 1, '{name} 行业报告 OR 市场分析 site:caixin.com OR site:yicai.com {prev_year} OR {year}'),
