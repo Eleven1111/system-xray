@@ -507,19 +507,20 @@ _DIMENSION_LABELS = {
     'D4': '时间代谢',
     'D5': '合法性叙事',
     'D6': '耦合架构',
+    'D7': '权力拓扑',
 }
 
 
 def build_radar_svg(scores: dict[str, int | float], size: int = 380) -> str:
     """
-    从六维评分生成内联 SVG 雷达图。
+    从 n 维评分生成内联 SVG 雷达图（支持任意维度数量）。
 
-    scores: {'D1': 3, 'D2': 4, 'D3': 2, 'D4': 5, 'D5': 3, 'D6': 4}
+    scores: {'D1': 3, 'D2': 4, ..., 'Dn': v}
     返回可直接嵌入 <div class="radar-container"> 的 SVG 字符串。
     """
     cx, cy = size / 2, size / 2
     r_max = size / 2 - 50
-    n = 6
+    n = len(scores)
     angle_offset = -math.pi / 2
 
     def polar(level: float, i: int) -> tuple[float, float]:
@@ -548,11 +549,10 @@ def build_radar_svg(scores: dict[str, int | float], size: int = 380) -> str:
             f'stroke="#94a3b8" stroke-width="0.5" opacity="0.3" />'
         )
 
-    dim_keys = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6']
+    dim_keys = sorted(scores.keys())
     data_pts = []
     for i, key in enumerate(dim_keys):
-        val = scores.get(key, 0)
-        val = max(0, min(5, val))
+        val = max(0, min(5, scores.get(key, 0)))
         data_pts.append(polar(val, i))
 
     pts_str = ' '.join(f'{x:.1f},{y:.1f}' for x, y in data_pts)
@@ -561,7 +561,7 @@ def build_radar_svg(scores: dict[str, int | float], size: int = 380) -> str:
         f'stroke="#2563eb" stroke-width="2" />'
     )
 
-    for i, (x, y) in enumerate(data_pts):
+    for x, y in data_pts:
         lines.append(f'  <circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="#2563eb" />')
 
     for i, key in enumerate(dim_keys):
