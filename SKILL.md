@@ -475,25 +475,52 @@ Each dimension has a **health score** (1-5) and **trajectory** (improving / stab
 
 ### Stage 3: Cross-Dimensional Interaction Analysis
 
-After scoring each dimension independently, analyze how they interact. The most dangerous pathologies are always cross-dimensional:
+After scoring each dimension independently, discover how they interact through a structured scan — not by matching known patterns.
 
-**Interaction matrix** — For each pair of dimensions, ask:
-- Does weakness in Dimension A amplify weakness in Dimension B?
-- Are there compensating effects (strength in A offsetting weakness in B)?
-- Where do vicious cycles span multiple dimensions?
+#### Step 3a — Dimension Pair Scan
 
-**Common cross-dimensional pathology patterns:**
+For each of the 21 dimension pairs (C(7,2)=21), ask:
+> "Does Di's current state amplify or suppress Dj's risk/health? Through what specific mechanism?"
+
+Classification:
+- **Strong**: Di changing 1 point would shift Dj by ≥0.5 points
+- **Weak**: Transmission mechanism exists but influence is uncertain or indirect
+- **None**: No plausible transmission mechanism
+
+Record only Strong and Weak interactions (expect 5-12 meaningful pairs per analysis).
+
+#### Step 3b — Feedback Loop Identification
+
+From interacting pairs, identify closed loops:
+
+| Type | Definition | Danger Level |
+|------|-----------|-------------|
+| Vicious Cycle | Di↓ → Dj↓ → ... → Di↓ | High: exponential deterioration |
+| Virtuous Cycle | Di↑ → Dj↑ → ... → Di↑ | Positive but may create fragile dependency |
+| Antagonism | Di↑ → Dj↓ | Medium: improving one dimension may cost another |
+
+#### Step 3c — Leverage Point Ranking
+
+The dimension appearing in the most feedback loops = the system's leverage point (Meadows). Rank dimensions by feedback loop participation count. The top leverage point should be the primary target for interventions in Stage 5.
+
+#### Step 3d — Known Pattern Matching
+
+Compare discovered interactions against the known pattern library below. If a discovered pattern matches, use its name. If it doesn't match any known pattern, label it as a novel system-specific pattern.
+
+**Known cross-dimensional pathology patterns:**
 
 | Pattern | Dimensions | Mechanism |
 |---------|-----------|-----------|
 | **Trust death spiral** | 1×2×5 | Boundary erosion → incentive gaming → narrative collapse → further boundary erosion |
 | **Innovation theater trap** | 4×5×2 | Renewal theater → maintained legitimacy → no pressure to fix incentives → actual renewal blocked |
 | **Information-incentive doom loop** | 3×2 | Bad incentives → filtered information → worse decisions → worse incentives |
-| **Legitimacy-coupling cascade** | 5×6 | Legitimacy loss → partners/suppliers decouple → capability loss → more legitimacy loss |
+| **Legitimacy-coupling cascade** | 5×6 | Legitimacy loss → partners decouple → capability loss → more legitimacy loss |
 | **Temporal-boundary squeeze** | 4×1 | Short-term focus → boundary investment deferred → sudden constraint breach |
 | **Power-information doom loop** | 7×3 | Power concentration → information filtering → worse decisions → more power concentration |
-| **Succession-temporal squeeze** | 7×4 | Uncertain succession → everyone shortens time horizon → no long-term investment → system weakens |
+| **Succession-temporal squeeze** | 7×4 | Uncertain succession → shortened time horizons → no long-term investment → system weakens |
 | **Power-legitimacy spiral** | 7×5 | Power grab erodes legitimacy → legitimacy loss triggers power struggle → further power grab |
+
+The known pattern library is an aid for naming, not a constraint on discovery. Always run Steps 3a-3c first.
 
 ### Stage 4: Critical Risk Node Identification
 
