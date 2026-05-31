@@ -40,6 +40,8 @@ print(json.dumps({'query_set': result, 'batches': batches}, ensure_ascii=False, 
 
 **同时**（一条消息内）派发所有批次的 Researcher，每个批次一个 Agent。
 
+**⚙️ 模型分层（强制）：所有 Researcher 一律用小模型派发（`Agent` 工具的 `model` 参数设为 `haiku`，复杂多语言批次可设 `sonnet`）。** Researcher 只做 WebSearch + 按 schema 吐 JSON，是纯采集任务，零判断——不需要 Orchestrator 的模型规格。判断密集的环节（七维评分、ACH、跨维交互、处方）留在 Orchestrator 自身执行。此规则对所有轮次的 Researcher 生效：Round 1 / Round 2（contradiction/data_anchor/gap_filler）/ 预测验证。
+
 **批次包含 Batch 0（近期事件扫描）+ Batch 1-N（结构性视角）。所有批次同时启动。**
 
 Batch 0 的查询专门抓取最近 30 天的重大事件（latest news、summit/deal/crisis、analysis/takeaways），确保分析基于最新信息。结构性视角查询覆盖更长时间窗口的趋势和深度分析。
@@ -49,8 +51,9 @@ PARALLEL DISPATCH（在同一条消息里调用所有 Agent）：
 
 Agent(
   description="Researcher batch 0: 近期事件扫描",
+  model="haiku",
   prompt="""
-  [直接粘贴 agent/prompts/researcher.md 内容]
+  [粘贴 researcher-base.md + researcher-sources.md 中本批次涉及语言的信源分级节，见下方「Researcher prompt 组装规则」]
 
   系统名称：{system_name}
   系统类型：{system_type}
@@ -65,8 +68,9 @@ Agent(
 
 Agent(
   description="Researcher batch 1: {batch_label}",
+  model="haiku",
   prompt="""
-  [直接粘贴 agent/prompts/researcher.md 内容]
+  [粘贴 researcher-base.md + researcher-sources.md 中本批次涉及语言的信源分级节]
 
   系统名称：{system_name}
   系统类型：{system_type}
@@ -82,7 +86,24 @@ Agent(
 ... 更多 Agent ...
 ```
 
-**关键**：所有 Researcher（包括 Batch 0）必须同时启动，不得串行等待。Researcher 的 prompt 来自 `agent/prompts/researcher.md`。
+**关键**：所有 Researcher（包括 Batch 0）必须同时启动，不得串行等待。
+
+---
+
+#### Researcher prompt 组装规则（最小上下文原则）
+
+Researcher 的 prompt **不是**整份大文件，而是按需拼装——只给该 Researcher 完成任务所需的最小高信号集合，避免把用不到的语言信源表和 Round 2 模式塞进每个 sub-agent。三个组件：
+
+| 文件 | 内容 | 何时粘贴 |
+|------|------|---------|
+| `agent/prompts/researcher-base.md` | 通用采集流程 + 英文信源分级 + 标准输出 schema + 规则 | **每个** Researcher 都粘贴 |
+| `agent/prompts/researcher-sources.md` | 6 种本地语言的信源分级节（zh/ar/fa/ru/ja/ko），各自带标题 | **仅**粘贴该批次 `lang` 字段涉及的语言节 |
+| `agent/prompts/researcher-modes.md` | 4 种 Round 2 模式节（gap_filler / contradiction_resolution / data_anchor / prediction_verification） | **仅** Round 2 / 预测验证时，粘贴对应模式节 |
+
+- 纯英文 Round-1 批次 → 只粘 `researcher-base.md`
+- 中文批次 → `researcher-base.md` + `researcher-sources.md` 的「中文 (zh)」节
+- Round 2 contradiction → `researcher-base.md` + `researcher-modes.md` 的「contradiction_resolution」节
+- 据 batch 内 `perspectives[].lang` 字段（及 `batch_label` 中的语言标识）判断该批次涉及哪些语言，据此决定粘哪个语言节
 
 ---
 
@@ -161,8 +182,9 @@ Agent(
 ```
 Agent(
   description="Round 2: contradiction resolver — {contradiction_description}",
+  model="haiku",
   prompt="""
-  [直接粘贴 agent/prompts/researcher.md 内容]
+  [粘贴 researcher-base.md + researcher-modes.md 的「contradiction_resolution」节]
 
   系统名称：{system_name}
   系统类型：{system_type}
@@ -174,8 +196,9 @@ Agent(
 
 Agent(
   description="Round 2: data anchor — {claim}",
+  model="haiku",
   prompt="""
-  [直接粘贴 agent/prompts/researcher.md 内容]
+  [粘贴 researcher-base.md + researcher-modes.md 的「data_anchor」节]
 
   系统名称：{system_name}
   系统类型：{system_type}
@@ -188,8 +211,9 @@ Agent(
 
 Agent(
   description="Round 2: gap filler — {perspective_key}",
+  model="haiku",
   prompt="""
-  [直接粘贴 agent/prompts/researcher.md 内容]
+  [粘贴 researcher-base.md + researcher-modes.md 的「gap_filler」节 + researcher-sources.md 中该视角涉及语言的信源分级节]
 
   系统名称：{system_name}
   系统类型：{system_type}
@@ -215,13 +239,7 @@ Agent(
 **前置检查：**
 ```bash
 cd /Users/na/.claude/skills/system-xray
-python3 -c "
-import json, sys
-sys.path.insert(0, '.')
-from agent.store.db import load_predictions
-preds = load_predictions('SYSTEM_NAME')
-print(json.dumps(preds, ensure_ascii=False, indent=2))
-"
+python3 -m agent.agent --system "SYSTEM_NAME" --load-predictions
 ```
 
 如果返回空列表 `[]`，跳过此步。
@@ -237,8 +255,9 @@ print(json.dumps(preds, ensure_ascii=False, indent=2))
 ```
 Agent(
   description="Prediction verification: {prediction_summary}",
+  model="haiku",
   prompt="""
-  [直接粘贴 agent/prompts/researcher.md 内容]
+  [粘贴 researcher-base.md + researcher-modes.md 的「prediction_verification」节]
 
   系统名称：{system_name}
   系统类型：{system_type}
@@ -496,13 +515,7 @@ print(json.dumps(results, ensure_ascii=False, indent=2))
 
 ```bash
 cd /Users/na/.claude/skills/system-xray
-python3 -c "
-import json, sys
-sys.path.insert(0, '.')
-from agent.store.db import load_latest
-data = load_latest('SYSTEM_NAME')
-print(json.dumps(data, ensure_ascii=False, indent=2) if data else 'null')
-"
+python3 -m agent.agent --system "SYSTEM_NAME" --load-latest
 ```
 
 如有历史数据，将本次维度评分与上期对比，输出变化趋势。
@@ -511,17 +524,17 @@ print(json.dumps(data, ensure_ascii=False, indent=2) if data else 'null')
 
 ### Step 7 — 持久化结果（JSON）
 
+把 analysis JSON 写入临时文件，再用 CLI 持久化（**不要**用内联 `python3 -c` 插值——多 KB JSON 含引号会撞坏 shell 转义）。落盘前 CLI 会自动调 `validate_analysis()` 校验结构，不合法会拒绝保存并打印错误清单。
+
 ```bash
 cd /Users/na/.claude/skills/system-xray
-python3 -c "
-import json, sys
-sys.path.insert(0, '.')
-from agent.store.db import save_analysis
-analysis = ANALYSIS_JSON
-path = save_analysis('SYSTEM_NAME', 'SYSTEM_TYPE', analysis)
-print(f'已保存到：{path}')
-"
+# 先用 Write 工具把 analysis JSON 写到 /tmp/sx_analysis.json
+python3 -m agent.agent --system "SYSTEM_NAME" --type SYSTEM_TYPE --save-analysis --input /tmp/sx_analysis.json
 ```
+
+**预测字段校验**（CLI 强制）：每条 `predictions` 必须含 `prediction` / `falsification_condition` / `time_horizon`（绝对日期 YYYY-MM-DD）/ `confidence`（0-1）/ `dimension_link`（D1-D7）/ `source_step`；`dimension_scores` 七维齐全且取值 1-5。若校验失败，按错误提示修正后重存。
+
+> 也可在不落盘的情况下先自检：`python3 -m agent.agent --validate --input /tmp/sx_analysis.json`
 
 ---
 
@@ -533,21 +546,15 @@ print(f'已保存到：{path}')
 
 #### Step 8a — 保存 Research Brief 原始素材（MD 格式）
 
-将 Step 4 的 Research Brief（含完整 sources、contradictions、coverage gaps）保存为 MD：
+将 Step 4 的 Research Brief（含完整 sources、contradictions、coverage gaps）保存为 MD。先用 Write 工具把合并后的 brief JSON 写到临时文件，再走 CLI：
 
 ```bash
 cd /Users/na/.claude/skills/system-xray
-python3 -c "
-import json, sys
-sys.path.insert(0, '.')
-from agent.store.db import save_research_materials
-brief = RESEARCH_BRIEF_JSON
-path = save_research_materials('SYSTEM_NAME', 'SYSTEM_TYPE', brief)
-print(f'素材已保存到：{path}')
-"
+# 先用 Write 工具把 Research Brief JSON 写到 /tmp/sx_brief.json
+python3 -m agent.agent --system "SYSTEM_NAME" --type SYSTEM_TYPE --save-materials --input /tmp/sx_brief.json
 ```
 
-**RESEARCH_BRIEF_JSON** 为所有 Researcher 返回的合并 JSON，包含：
+**brief JSON** 为所有 Researcher 返回的合并 JSON，包含：
 - `sources`: 所有信源（query, title, url, excerpt, tier, date）
 - `contradictions`: 矛盾信号
 - `no_source_perspectives` / `stale_perspectives`: 覆盖缺口
@@ -564,21 +571,15 @@ print(f'素材已保存到：{path}')
 - 坏标题示例：「中美关系系统诊断报告」「ByteDance — 系统诊断报告」（禁止使用这类模板化标题）
 - 标题从诊断结论中提炼，必须在分析完成后才能确定，不能提前拟定
 
-将 Step 5 生成的报告转换为 HTML 片段，然后调用 `save_html_report`：
+将 Step 5 生成的报告转换为 HTML 片段，用 Write 工具写到临时文件，再走 CLI（报告正文必含中文引号、反引号、HTML 标签，**绝不能**用内联 `python3 -c '''...'''` 插值）：
 
 ```bash
 cd /Users/na/.claude/skills/system-xray
-python3 -c "
-import sys
-sys.path.insert(0, '.')
-from agent.store.db import save_html_report
-body_html = '''REPORT_BODY_HTML'''
-path = save_html_report('SYSTEM_NAME', 'SYSTEM_TYPE', body_html, title='EDITORIAL_TITLE')
-print(f'HTML 报告已保存到：{path}')
-"
+# 先用 Write 工具把报告正文 HTML 片段写到 /tmp/sx_body.html
+python3 -m agent.agent --system "SYSTEM_NAME" --type SYSTEM_TYPE --save-html --title "EDITORIAL_TITLE" --input /tmp/sx_body.html
 ```
 
-**EDITORIAL_TITLE** 为上面生成的智库风格标题。**REPORT_BODY_HTML** 为报告正文的 HTML 片段（不含 html/head/body 标签，模板会包裹）。
+**EDITORIAL_TITLE** 为上面生成的智库风格标题。`/tmp/sx_body.html` 为报告正文的 HTML 片段（不含 html/head/body 标签，模板会包裹）。
 
 **Markdown → HTML 转换规则（Orchestrator 执行）：**
 
@@ -597,33 +598,26 @@ print(f'HTML 报告已保存到：{path}')
 
 **雷达图生成（必须调用 helper，不得手写 SVG）：**
 
+把七维评分 JSON（如 `{"D1": 3, "D2": 4, "D3": 2, "D4": 5, "D5": 3, "D6": 4, "D7": 3}`）写到临时文件，再走 CLI：
+
 ```bash
 cd /Users/na/.claude/skills/system-xray
-python3 -c "
-import sys
-sys.path.insert(0, '.')
-from agent.store.db import build_radar_svg
-svg = build_radar_svg({'D1': 3, 'D2': 4, 'D3': 2, 'D4': 5, 'D5': 3, 'D6': 4})
-print(svg)
-"
+# 先用 Write 工具把七维评分 JSON 写到 /tmp/sx_scores.json
+python3 -m agent.agent --radar --input /tmp/sx_scores.json
 ```
 
-将 `{'D1': 3, ...}` 替换为实际七维评分。返回的 SVG 字符串直接嵌入 `<div class="radar-container">...</div>` 中。
+返回的 SVG 字符串直接嵌入 `<div class="radar-container">...</div>` 中。评分 JSON 用实际七维分值。
 
 ---
 
 #### Step 8c — 同时保存 Markdown 备份到 Obsidian
 
+用 Write 工具把报告 Markdown 写到临时文件，再走 CLI：
+
 ```bash
 cd /Users/na/.claude/skills/system-xray
-python3 -c "
-import sys
-sys.path.insert(0, '.')
-from agent.store.db import save_to_obsidian
-report = '''REPORT_MARKDOWN'''
-path = save_to_obsidian('SYSTEM_NAME', 'SYSTEM_TYPE', report)
-print(f'MD 报告已保存到：{path}')
-"
+# 先用 Write 工具把报告 Markdown 写到 /tmp/sx_report.md
+python3 -m agent.agent --system "SYSTEM_NAME" --type SYSTEM_TYPE --save-md --input /tmp/sx_report.md
 ```
 
 **最终 Obsidian 目录结构：**
@@ -640,9 +634,9 @@ System Pathology/
 
 | 层级 | 英文信源 | 本地语言信源（按检测结果激活） |
 |------|---------|------|
-| T1 | 政府文件、财务报表、法院记录、链上数据 | 各国官方文件/通讯社（详见 researcher.md 分语种表） |
-| T2 | 路透社、FT、WSJ、学术机构、智库 | 各国机构媒体/智库（详见 researcher.md 分语种表） |
-| T3 | Glassdoor、Reddit、Twitter/X | 各国社交媒体/论坛（详见 researcher.md 分语种表） |
+| T1 | 政府文件、财务报表、法院记录、链上数据 | 各国官方文件/通讯社（详见 researcher-sources.md 分语种表） |
+| T2 | 路透社、FT、WSJ、学术机构、智库 | 各国机构媒体/智库（详见 researcher-sources.md 分语种表） |
+| T3 | Glassdoor、Reddit、Twitter/X | 各国社交媒体/论坛（详见 researcher-sources.md 分语种表） |
 | ⚠️ | 训练知识（仅作背景，须显式标注，不计入评分依据） | 同左 |
 
 当前支持 6 种本地语言：中文(zh)、阿拉伯语(ar)、波斯语(fa)、俄语(ru)、日语(ja)、韩语(ko)。

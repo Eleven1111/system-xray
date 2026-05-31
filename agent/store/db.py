@@ -8,11 +8,117 @@ Obsidian 导出（MD 素材 + HTML 报告）：
 
 import json
 import math
+import re
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
 
 DATA_DIR = Path.home() / '.system_pathology' / 'data'
+
+_VALID_DIMS = {'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7'}
+_VALID_SOURCE_STEPS = {'dimension_analysis', 'cross_dimensional'}
+_DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+
+
+def _validate_predictions(preds, field_name: str) -> list[str]:
+    """校验预测数组的字段完整性与取值合法性，返回错误列表。"""
+    errors: list[str] = []
+    if not isinstance(preds, list):
+        return [f'{field_name} 必须是数组，实际为 {type(preds).__name__}']
+
+    required = ['prediction', 'falsification_condition', 'time_horizon',
+                'confidence', 'dimension_link', 'source_step']
+    for i, p in enumerate(preds):
+        tag = f'{field_name}[{i}]'
+        if not isinstance(p, dict):
+            errors.append(f'{tag} 必须是对象')
+            continue
+        for key in required:
+            if key not in p or p[key] in (None, ''):
+                errors.append(f'{tag} 缺少必填字段 `{key}`')
+
+        th = p.get('time_horizon')
+        if th is not None and not _DATE_RE.match(str(th)):
+            errors.append(f'{tag}.time_horizon 必须为绝对日期 YYYY-MM-DD，实际为 "{th}"')
+        elif th is not None:
+            try:
+                datetime.strptime(str(th), '%Y-%m-%d')
+            except ValueError:
+                errors.append(f'{tag}.time_horizon 不是合法日期："{th}"')
+
+        conf = p.get('confidence')
+        if conf is not None:
+            if not isinstance(conf, (int, float)) or isinstance(conf, bool):
+                errors.append(f'{tag}.confidence 必须是数字，实际为 {conf!r}')
+            elif not (0.0 <= conf <= 1.0):
+                errors.append(f'{tag}.confidence 必须在 [0,1] 区间，实际为 {conf}')
+
+        dl = p.get('dimension_link')
+        if dl is not None and dl not in _VALID_DIMS:
+            errors.append(f'{tag}.dimension_link 必须是 D1-D7，实际为 "{dl}"')
+
+        ss = p.get('source_step')
+        if ss is not None and ss not in _VALID_SOURCE_STEPS:
+            errors.append(
+                f'{tag}.source_step 必须是 {sorted(_VALID_SOURCE_STEPS)} 之一，实际为 "{ss}"'
+            )
+    return errors
+
+
+def validate_analysis(analysis: dict) -> list[str]:
+    """
+    在持久化前校验分析结果的结构合法性（针对存储 shape，非 diagnostic-schema.json）。
+
+    返回错误字符串列表；空列表 = 通过。错误信息可直接回报给 Orchestrator 修正。
+
+    校验项：
+      - dimension_scores: 必须存在；键 ⊆ D1-D7；七维齐全；每个分值为 1-5 数字
+      - overall_score（如有）: 1-5 数字
+      - predictions / candidate_predictions（如有）: 字段完整、time_horizon 绝对日期、
+        confidence ∈ [0,1]、dimension_link 属 D1-D7、source_step 合法枚举
+    """
+    errors: list[str] = []
+    if not isinstance(analysis, dict):
+        return [f'analysis 必须是对象，实际为 {type(analysis).__name__}']
+
+    scores = analysis.get('dimension_scores')
+    if scores is None:
+        errors.append('缺少必填字段 `dimension_scores`')
+    elif not isinstance(scores, dict):
+        errors.append(f'dimension_scores 必须是对象，实际为 {type(scores).__name__}')
+    elif not scores:
+        # 空 dict = 无法生成雷达图/类比/历史对比，是 C1 要拦截的"静默坏数据"典型
+        errors.append('dimension_scores 不能为空（至少需要诊断出的各维度评分）')
+    else:
+        # 注：不强制七维齐全——D7 为后增维度，历史上 6 维（D1-D6）分析合法（见雷达图 helper 对任意维度数的支持）。
+        # 只拦截"非法维度键"和"分值越界"这类无歧义的错误。
+        unknown = set(scores) - _VALID_DIMS
+        if unknown:
+            errors.append(
+                f'dimension_scores 含非法维度键：{sorted(unknown)}'
+                f'（仅允许 D1-D7 短键；描述性键如 D1_boundary_topology 会让 radar/analogy 工具失效）'
+            )
+        for dim, val in scores.items():
+            if dim not in _VALID_DIMS:
+                continue
+            if not isinstance(val, (int, float)) or isinstance(val, bool):
+                errors.append(f'dimension_scores.{dim} 必须是数字，实际为 {val!r}')
+            elif not (1 <= val <= 5):
+                errors.append(f'dimension_scores.{dim} 必须在 1-5 区间，实际为 {val}')
+
+    overall = analysis.get('overall_score')
+    if overall is not None:
+        if not isinstance(overall, (int, float)) or isinstance(overall, bool):
+            errors.append(f'overall_score 必须是数字，实际为 {overall!r}')
+        elif not (1 <= overall <= 5):
+            errors.append(f'overall_score 必须在 1-5 区间，实际为 {overall}')
+
+    if 'predictions' in analysis:
+        errors.extend(_validate_predictions(analysis['predictions'], 'predictions'))
+    if 'candidate_predictions' in analysis:
+        errors.extend(_validate_predictions(analysis['candidate_predictions'], 'candidate_predictions'))
+
+    return errors
 OBSIDIAN_DIR = Path('/Users/na/Library/Mobile Documents/iCloud~md~obsidian/Documents/System Pathology')
 
 
@@ -21,7 +127,10 @@ def _system_dir(system_name: str) -> Path:
     return DATA_DIR / safe
 
 
-def save_analysis(system_name: str, system_type: str, analysis: dict, date_str: str | None = None) -> str:
+def save_analysis(
+    system_name: str, system_type: str, analysis: dict,
+    date_str: str | None = None, validate: bool = True,
+) -> str:
     """
     保存分析结果，返回文件路径。
 
@@ -32,7 +141,17 @@ def save_analysis(system_name: str, system_type: str, analysis: dict, date_str: 
       source_coverage: {perspective: bool}
       output_mode: 'full' | 'brief'
       predictions: [{prediction, falsification_condition, time_horizon, ...}]  （可选）
+
+    validate=True（默认）时，落盘前调用 validate_analysis() 校验结构；不合法则
+    抛 ValueError 并附完整错误清单，避免污染数据持久化。测试可传 validate=False 绕过。
     """
+    if validate:
+        errors = validate_analysis(analysis)
+        if errors:
+            raise ValueError(
+                'analysis 结构校验失败，已拒绝持久化：\n  - ' + '\n  - '.join(errors)
+            )
+
     if date_str is None:
         date_str = datetime.now().strftime('%Y%m%d')
 

@@ -17,7 +17,19 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agent.tools.query_generator import generate_queries, format_for_claude, SYSTEM_TYPES
-from agent.store.db import list_analyses, load_latest
+from agent.store.db import (
+    list_analyses, load_latest, load_predictions,
+    save_analysis, save_html_report, save_research_materials,
+    save_to_obsidian, build_radar_svg, validate_analysis,
+)
+
+
+def _read_payload(path: str | None) -> str:
+    """从文件读取 payload；path 为 '-' 或 None 时从 stdin 读。"""
+    if path and path != '-':
+        with open(path, 'r', encoding='utf-8') as f:
+            return f.read()
+    return sys.stdin.read()
 
 
 def cmd_list_types():
@@ -63,7 +75,7 @@ def cmd_full_analysis(args):
     print('=' * 60)
     print(format_for_claude(result))
 
-    mode_str = 'BRIEF（精简报告）' if args.brief else 'FULL（完整六维诊断）'
+    mode_str = 'BRIEF（精简报告）' if args.brief else 'FULL（完整七维诊断）'
     print(f'\n输出模式：{mode_str}')
 
     # 检查是否有历史分析
@@ -87,6 +99,69 @@ def cmd_full_analysis(args):
     print('```')
 
 
+def cmd_validate(args):
+    """仅校验 analysis JSON 结构，不落盘。退出码 0=通过，1=有错误。"""
+    analysis = json.loads(_read_payload(args.input))
+    errors = validate_analysis(analysis)
+    if errors:
+        print('❌ 校验失败：')
+        for e in errors:
+            print(f'  - {e}')
+        sys.exit(1)
+    print('✅ 校验通过')
+
+
+def cmd_save_analysis(args):
+    """从文件/stdin 读取 analysis JSON 并持久化（落盘前自动校验）。"""
+    analysis = json.loads(_read_payload(args.input))
+    try:
+        path = save_analysis(args.system, args.type, analysis, date_str=args.date)
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        sys.exit(1)
+    print(f'已保存到：{path}')
+
+
+def cmd_save_materials(args):
+    """从文件/stdin 读取 Research Brief JSON 并保存为 MD 素材。"""
+    brief = json.loads(_read_payload(args.input))
+    path = save_research_materials(args.system, args.type, brief, date_str=args.date)
+    print(f'素材已保存到：{path}')
+
+
+def cmd_save_html(args):
+    """从文件/stdin 读取报告正文 HTML 并保存为智库风格 HTML 报告。"""
+    body_html = _read_payload(args.input)
+    path = save_html_report(
+        args.system, args.type, body_html, date_str=args.date, title=args.title,
+    )
+    print(f'HTML 报告已保存到：{path}')
+
+
+def cmd_save_md(args):
+    """从文件/stdin 读取报告 Markdown 并保存为 Obsidian 备份。"""
+    report = _read_payload(args.input)
+    path = save_to_obsidian(args.system, args.type, report, date_str=args.date)
+    print(f'MD 报告已保存到：{path}')
+
+
+def cmd_radar(args):
+    """从文件/stdin 读取七维评分 JSON，输出内联雷达图 SVG。"""
+    scores = json.loads(_read_payload(args.input))
+    print(build_radar_svg(scores))
+
+
+def cmd_load_predictions(args):
+    """输出指定系统上次分析的预测列表 JSON（无则 []）。"""
+    print(json.dumps(load_predictions(args.system), ensure_ascii=False, indent=2))
+
+
+def cmd_load_latest(args):
+    """输出指定系统上次分析的完整记录 JSON（无则 null）。"""
+    data = load_latest(args.system)
+    print(json.dumps(data, ensure_ascii=False, indent=2) if data else 'null')
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='System Pathology Agent — 多视角系统诊断',
@@ -98,15 +173,35 @@ def main():
   python3 -m agent.agent --system "DeFi" --type market --queries-only
   python3 -m agent.agent --system "ByteDance" --history
   python3 -m agent.agent --list-types
+
+持久化（payload 从 --input 文件或 stdin 读取，避免内联 shell 转义问题）：
+  python3 -m agent.agent --system "X" --type public_company --save-analysis --input analysis.json
+  cat analysis.json | python3 -m agent.agent -s "X" -t public_company --save-analysis
+  python3 -m agent.agent -s "X" -t public_company --save-html --title "标题" --input body.html
+  python3 -m agent.agent -s "X" -t public_company --save-materials --input brief.json
+  python3 -m agent.agent --validate --input analysis.json
+  python3 -m agent.agent --radar --input scores.json
+  python3 -m agent.agent --system "X" --load-predictions
         """
     )
     parser.add_argument('--system',      '-s', help='系统名称')
     parser.add_argument('--type',        '-t', choices=SYSTEM_TYPES, help='系统类型')
-    parser.add_argument('--date',        '-d', help='分析日期 YYYYMMDD（默认今天）')
+    parser.add_argument('--date',        '-d', help='分析日期（JSON 存储用 YYYYMMDD，Obsidian 文件用 YYYY-MM-DD；默认今天）')
     parser.add_argument('--brief',       action='store_true', help='精简输出模式')
     parser.add_argument('--queries-only',action='store_true', help='仅生成搜索查询集')
     parser.add_argument('--history',     action='store_true', help='查看历史分析记录')
     parser.add_argument('--list-types',  action='store_true', help='列出所有可用系统类型')
+    # ── 持久化 / 校验子命令（payload 走文件或 stdin，不走内联插值）──
+    parser.add_argument('--input',       '-i', help='payload 文件路径；省略或 "-" 则从 stdin 读取')
+    parser.add_argument('--title',       help='--save-html 的报告标题')
+    parser.add_argument('--save-analysis',  action='store_true', help='读取 analysis JSON 并持久化（落盘前校验）')
+    parser.add_argument('--save-html',      action='store_true', help='读取报告正文 HTML 并保存为智库风格报告')
+    parser.add_argument('--save-materials', action='store_true', help='读取 Research Brief JSON 并保存为 MD 素材')
+    parser.add_argument('--save-md',        action='store_true', help='读取报告 Markdown 并保存为 Obsidian 备份')
+    parser.add_argument('--validate',       action='store_true', help='仅校验 analysis JSON 结构，不落盘')
+    parser.add_argument('--radar',          action='store_true', help='读取七维评分 JSON，输出雷达图 SVG')
+    parser.add_argument('--load-predictions', action='store_true', help='输出上次分析的预测列表 JSON')
+    parser.add_argument('--load-latest',    action='store_true', help='输出上次分析的完整记录 JSON')
 
     args = parser.parse_args()
 
@@ -114,10 +209,44 @@ def main():
         cmd_list_types()
         return
 
+    if args.validate:
+        cmd_validate(args)
+        return
+
+    if args.radar:
+        cmd_radar(args)
+        return
+
     if args.history:
         if not args.system:
             parser.error('--history 需要 --system 参数')
         cmd_history(args)
+        return
+
+    if args.load_predictions:
+        if not args.system:
+            parser.error('--load-predictions 需要 --system 参数')
+        cmd_load_predictions(args)
+        return
+
+    if args.load_latest:
+        if not args.system:
+            parser.error('--load-latest 需要 --system 参数')
+        cmd_load_latest(args)
+        return
+
+    # 持久化子命令需要 --system 和 --type
+    if args.save_analysis or args.save_html or args.save_materials or args.save_md:
+        if not args.system or not args.type:
+            parser.error('持久化子命令需要 --system 和 --type 参数')
+        if args.save_analysis:
+            cmd_save_analysis(args)
+        elif args.save_html:
+            cmd_save_html(args)
+        elif args.save_materials:
+            cmd_save_materials(args)
+        elif args.save_md:
+            cmd_save_md(args)
         return
 
     if not args.system or not args.type:

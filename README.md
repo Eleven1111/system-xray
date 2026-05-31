@@ -120,7 +120,9 @@ system-xray/
 │   ├── agent.py                          # CLI entry point (query preview, history)
 │   ├── prompts/
 │   │   ├── system.md                     # Orchestrator prompt (8-step pipeline)
-│   │   └── researcher.md                 # Researcher sub-agent prompt (standard + 4 Round 2 modes)
+│   │   ├── researcher-base.md            # Researcher universal core (workflow + EN tiers + schema)
+│   │   ├── researcher-sources.md         # Per-language source tier tables (paste relevant only)
+│   │   └── researcher-modes.md           # 4 Round 2 modes (paste relevant only)
 │   ├── store/
 │   │   ├── db.py                         # Persistence: JSON, MD, HTML, radar SVG, predictions
 │   │   └── __init__.py
@@ -224,7 +226,7 @@ Three steps in `agent/tools/query_generator.py`:
 2. Add entry to `LOCAL_PERSPECTIVES` (per-system-type structural perspectives)
 3. Add entry to `PERSPECTIVE_LABELS` (Chinese labels for each perspective key)
 
-Then add source tier tables in `agent/prompts/researcher.md`.
+Then add a source tier section in `agent/prompts/researcher-sources.md`.
 
 ### Adding a new system type
 

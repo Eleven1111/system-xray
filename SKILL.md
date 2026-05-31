@@ -29,7 +29,9 @@ Always read `scoring-calibration.md` before assigning any dimension scores.
 
 This skill has an `agent/` directory with full orchestrator-subagent infrastructure:
 - `agent/prompts/system.md` — **Orchestrator** 提示词（调用工具、派发 Researcher、综合分析）
-- `agent/prompts/researcher.md` — **Researcher sub-agent** 提示词（标准采集 + 4 种 Round 2 模式：gap_filler / contradiction_resolution / data_anchor / prediction_verification）
+- `agent/prompts/researcher-base.md` — **Researcher sub-agent** 通用核心提示词（采集流程 + 英文信源分级 + 标准 schema + 规则；每个 Researcher 必含）
+- `agent/prompts/researcher-sources.md` — 6 种本地语言信源分级表（按需粘贴该批次涉及的语言节）
+- `agent/prompts/researcher-modes.md` — 4 种 Round 2 模式：gap_filler / contradiction_resolution / data_anchor / prediction_verification（仅 Round 2 时按需粘贴对应节）
 - `agent/tools/query_generator.py` — 生成多视角查询集 + 并行批次分组（纯计算）
 - `agent/tools/history_compare.py` — 跨期维度评分对比 + 预测校准分数计算 + 历史类比匹配（纯计算）
 - `agent/store/db.py` — 持久化（JSON + MD素材 + HTML智库报告 + 雷达图SVG + 预测加载）
@@ -111,7 +113,7 @@ Orchestrator（你）
 | ⚠️ | 训练知识（须标注，不计入评分依据） | 同左 |
 
 支持 6 种本地语言自动检测：中文(zh)、阿拉伯语(ar)、波斯语(fa)、俄语(ru)、日语(ja)、韩语(ko)。
-分语种 T1/T2/T3 详表见 `agent/prompts/researcher.md`。检测返回 set，可同时触发多语言。
+分语种 T1/T2/T3 详表见 `agent/prompts/researcher-sources.md`。检测返回 set，可同时触发多语言。
 
 ---
 
@@ -159,7 +161,7 @@ HTML 报告使用 `build_radar_svg(scores)` 生成七维雷达图内联 SVG。Or
 
 3. **PERSPECTIVE_LABELS** 添加条目：为新语言的每个视角 key 添加中文标签。
 
-然后在 `agent/prompts/researcher.md` 和 `references/research-protocol.md` 中添加对应的信源分级表和采集规则。
+然后在 `agent/prompts/researcher-sources.md` 中添加对应的信源分级节，并在 `references/research-protocol.md` 中补充采集规则。
 
 ---
 

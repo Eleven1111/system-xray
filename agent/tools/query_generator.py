@@ -823,7 +823,7 @@ def format_for_claude(query_result: dict) -> str:
         '- [ ] Priority 0 近期事件已扫描，最近 30 天重大事件已记录',
         '- [ ] 矛盾信号已在 Research Brief 中显式标注',
         f'- [ ] P2 建议视角覆盖率 ≥ 50%：{p2_cov}',
-        '- [ ] Research Brief 完成后方可进入六维分析',
+        '- [ ] Research Brief 完成后方可进入七维分析',
     ]
 
     return '\n'.join(lines)
