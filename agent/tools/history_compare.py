@@ -204,27 +204,44 @@ def _load_cases() -> list[dict]:
     return _CASES_CACHE
 
 
-def _cosine_similarity(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    mag_a = math.sqrt(sum(x * x for x in a))
-    mag_b = math.sqrt(sum(x * x for x in b))
-    if mag_a == 0 or mag_b == 0:
+def _distance_similarity(a: list[float], b: list[float]) -> float:
+    """
+    基于欧氏距离的相似度（量级敏感），返回 [0,1]，1.0=完全相同。
+
+    用欧氏距离而非余弦：健康评分向量比的是"高低水平+形状"，不是"方向"。
+    余弦只看方向——七维全低(危机)与全高(健康)因各维度比例接近会被判高度相似，
+    这是真实的度量缺陷（曾使危机系统与瑞士/新加坡相似度同为 1.0）。
+
+    归一化：每维取值 1-5，最大单维差=4，n 维最大距离=sqrt(n*16)，
+    使 6 维与 7 维查询都落在可比的 [0,1] 标度。
+    """
+    n = len(a)
+    if n == 0:
         return 0.0
-    return dot / (mag_a * mag_b)
+    dist = math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+    max_dist = math.sqrt(n * 16)
+    return 1.0 - dist / max_dist
+
+
+# 同类型系统加性 tiebreaker（非乘性）：在线性标度上，乘性 1.2x 会让松散匹配的同类型
+# 反超紧密匹配的跨类型。加性微调只在相似度接近时起决胜作用，clamp 到 1.0。
+_SAME_TYPE_BONUS = 0.08
 
 
 def find_analogies(current_scores: dict, system_type: str | None = None, top_k: int = 3) -> list[dict]:
     cases = _load_cases()
     dim_keys = sorted(current_scores.keys())
-    current_vec = [current_scores.get(k, 0) for k in dim_keys]
+    # 缺省值取中性 3（非 0）：避免缺维在欧氏距离下变成 |score-0| 的幽灵距离，
+    # 把某 case 错误推向"最远"。当前案例库 43 条均为规范 7 维，此为防御未来 6 维查询。
+    current_vec = [current_scores.get(k, 3) for k in dim_keys]
 
     scored = []
     for case in cases:
-        case_vec = [case['scores'].get(k, 0) for k in dim_keys]
-        sim = _cosine_similarity(current_vec, case_vec)
+        case_vec = [case['scores'].get(k, 3) for k in dim_keys]
+        sim = _distance_similarity(current_vec, case_vec)
         if system_type and case.get('system_type') == system_type:
-            sim *= 1.2
-        sim = min(sim, 1.0)
+            sim = min(sim + _SAME_TYPE_BONUS, 1.0)
+        sim = max(0.0, min(sim, 1.0))
         scored.append({
             'similarity': round(sim, 4),
             'name': case['name'],

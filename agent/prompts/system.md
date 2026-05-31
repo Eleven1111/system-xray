@@ -40,7 +40,11 @@ print(json.dumps({'query_set': result, 'batches': batches}, ensure_ascii=False, 
 
 **同时**（一条消息内）派发所有批次的 Researcher，每个批次一个 Agent。
 
-**⚙️ 模型分层（强制）：所有 Researcher 一律用小模型派发（`Agent` 工具的 `model` 参数设为 `haiku`，复杂多语言批次可设 `sonnet`）。** Researcher 只做 WebSearch + 按 schema 吐 JSON，是纯采集任务，零判断——不需要 Orchestrator 的模型规格。判断密集的环节（七维评分、ACH、跨维交互、处方）留在 Orchestrator 自身执行。此规则对所有轮次的 Researcher 生效：Round 1 / Round 2（contradiction/data_anchor/gap_filler）/ 预测验证。
+**⚙️ 模型分层（强制）：Researcher 是纯采集任务（WebSearch + 按 schema 吐 JSON，零判断），按批次语言选模型——**
+- **英文 / 近期事件批次 → `haiku`**（`Agent` 工具 `model="haiku"`）：拉丁字符检索 + 结构化输出，haiku 足够，快且省。
+- **非拉丁本地语言批次（ar/fa/ru/ja/ko）→ `sonnet`**（`model="sonnet"`）：sonnet 多语言检索能力更强，且对"研究员只采集"这类结构化角色设定**远不易拒绝执行**（haiku 曾因怀疑指令异常而拒跑波斯语批次）。中文(zh)批次可用 haiku，但若查询含大量中文一手站点限定也可升 sonnet。
+
+判断密集的环节（七维评分、ACH、跨维交互、处方）一律留在 Orchestrator 自身执行。此规则对所有轮次生效：Round 1 / Round 2（contradiction/data_anchor/gap_filler）/ 预测验证；Round 2 与预测验证若涉及本地语言信源，同样按上面规则升 sonnet。
 
 **批次包含 Batch 0（近期事件扫描）+ Batch 1-N（结构性视角）。所有批次同时启动。**
 
@@ -68,9 +72,9 @@ Agent(
 
 Agent(
   description="Researcher batch 1: {batch_label}",
-  model="haiku",
+  model="haiku",                       # 英文结构性批次 → haiku
   prompt="""
-  [粘贴 researcher-base.md + researcher-sources.md 中本批次涉及语言的信源分级节]
+  [粘贴 researcher-base.md]
 
   系统名称：{system_name}
   系统类型：{system_type}
@@ -80,6 +84,22 @@ Agent(
     1. {query_1}
     2. {query_2}
     ...
+  """
+)
+
+Agent(
+  description="Researcher batch N: {本地语言}信源采集",
+  model="sonnet",                      # 非拉丁本地语言批次(ar/fa/ru/ja/ko) → sonnet
+  prompt="""
+  [粘贴 researcher-base.md + researcher-sources.md 中该语言的信源分级节]
+
+  系统名称：{system_name}
+  系统类型：{system_type}
+  分析日期：{analysis_date}
+  你负责的视角：{batch_label}（本地语言信源）
+  需要执行的查询：
+    1. {query_1}
+    2. {query_2}
   """
 )
 

@@ -70,3 +70,36 @@ def test_find_analogies_includes_key_lesson():
     results = find_analogies(scores, top_k=1)
     assert 'key_lesson' in results[0]
     assert len(results[0]['key_lesson']) > 10
+
+
+def test_metric_is_magnitude_aware_not_cosine():
+    # 回归测试：危机向量(全低) 不应与健康系统(全高) 高度相似。
+    # 余弦相似度的缺陷曾使两者同为 1.0；欧氏度量应明确区分。
+    from agent.tools.history_compare import _distance_similarity
+    crisis = [2, 2, 2, 2, 2, 1, 2]
+    healthy = [5, 4, 4, 4, 5, 5, 5]
+    assert _distance_similarity(crisis, crisis) == 1.0
+    assert _distance_similarity(crisis, healthy) < 0.5  # cosine 会给 ~1.0
+
+
+def test_find_analogies_crisis_vector_matches_distressed_not_healthy():
+    # 危机向量的 top 类比应是受困/崩溃系统，而非瑞士/新加坡这类健康系统
+    from agent.tools.history_compare import find_analogies
+    scores = {'D1': 2, 'D2': 2, 'D3': 2, 'D4': 2, 'D5': 2, 'D6': 1, 'D7': 2}
+    results = find_analogies(scores, system_type='geopolitical', top_k=5)
+    names = {r['name'] for r in results}
+    assert 'Switzerland (ongoing)' not in names
+    assert 'Singapore (ongoing)' not in names
+    # 至少一个公认的崩溃/危机案例进入 top 5
+    assert names & {'Soviet Union (1989)', 'Venezuela (2024)', 'Lebanon (2020-2024)',
+                    'Libya post-2011 (2020s)', 'WeWork (2019)'}
+
+
+def test_same_type_bonus_is_additive_tiebreaker():
+    # 同类型加性微调不应让松散匹配的同类型反超紧密匹配的跨类型
+    from agent.tools.history_compare import find_analogies, _SAME_TYPE_BONUS
+    assert _SAME_TYPE_BONUS <= 0.1  # tiebreaker 量级，非主导
+    # 近乎完全匹配某 geopolitical case 时，加 bonus 后仍 ≤ 1.0
+    scores = {'D1': 5, 'D2': 4, 'D3': 4, 'D4': 4, 'D5': 5, 'D6': 5, 'D7': 5}  # Switzerland
+    results = find_analogies(scores, system_type='geopolitical', top_k=1)
+    assert results[0]['similarity'] <= 1.0
