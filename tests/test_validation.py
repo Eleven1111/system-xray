@@ -273,6 +273,7 @@ def test_process_warnings_clean_when_all_good():
                              'source_verification_done': True, 'unresolved_high_contradictions': 0}
     a['dimension_evidence'] = {d: [{'title': 't', 'url': f'https://e/{d}'}]
                                for d in ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']}
+    a['source_verification'] = [{'url': 'https://e/D1', 'status': 'confirmed'}]
     assert process_warnings(a) == []
 
 
@@ -350,3 +351,71 @@ def test_process_warnings_breaking_event_sweep_skipped():
                              'breaking_event_sweep_done': False}
     w = process_warnings(a)
     assert any('突发事件扫描' in x for x in w)
+
+
+# ── 内容可信度：source verification sampling + 强制记录 ──
+
+def test_select_verification_sample_prioritizes_t1_and_numbers():
+    from agent.store.db import select_verification_sample
+    sources = [
+        {'title': 'blog post', 'url': 'https://b/1', 'tier': 3, 'excerpt': '泛泛而谈'},
+        {'title': 'gov report 39 executions', 'url': 'https://g/2', 'tier': 1, 'excerpt': '39 起'},
+        {'title': 'news no number', 'url': 'https://n/3', 'tier': 2, 'excerpt': '无数字'},
+    ]
+    sample = select_verification_sample(sources, n=2)
+    urls = [s['url'] for s in sample]
+    assert 'https://g/2' == urls[0]      # T1 + 含数字 → 最优先
+    assert 'https://b/1' not in urls     # T3 无数字 → 落选
+
+
+def test_select_verification_sample_dedups_and_limits():
+    from agent.store.db import select_verification_sample
+    sources = [{'title': 'a', 'url': 'https://x/1', 'tier': 1}] * 3 + \
+              [{'title': 'b', 'url': 'https://x/2', 'tier': 2}]
+    sample = select_verification_sample(sources, n=5)
+    assert len(sample) == 2  # 去重后只剩 2 个 url
+
+
+def test_build_audit_annotates_verification_badges():
+    from agent.store.db import build_source_audit_html
+    sources = [{'title': 'A', 'url': 'https://e/1', 'tier': 1, 'date': '2026-05-01'},
+               {'title': 'B', 'url': 'https://e/2', 'tier': 2, 'date': '2026-05-02'}]
+    verifications = [{'url': 'https://e/1', 'status': 'confirmed'},
+                     {'url': 'https://e/2', 'status': 'dead'}]
+    html = build_source_audit_html(sources, verifications=verifications)
+    assert '✓核实' in html
+    assert '✗失效' in html
+    assert '已抽查核验 2 条' in html
+
+
+def test_process_warnings_verification_claimed_without_records():
+    from agent.store.db import process_warnings
+    a = _valid_analysis()
+    a['dimension_evidence'] = {d: [{'title': 't', 'url': f'https://e/{d}'}]
+                               for d in ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']}
+    a['process_metadata'] = {'ach_run': True, 'source_verification_done': True}  # 声称做了但无记录
+    w = process_warnings(a)
+    assert any('缺 source_verification 记录' in x for x in w)
+
+
+def test_process_warnings_surfaces_dead_sources():
+    from agent.store.db import process_warnings
+    a = _valid_analysis()
+    a['dimension_evidence'] = {d: [{'title': 't', 'url': f'https://e/{d}'}]
+                               for d in ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']}
+    a['process_metadata'] = {'ach_run': True, 'source_verification_done': True}
+    a['source_verification'] = [{'url': 'https://e/1', 'status': 'confirmed'},
+                                {'url': 'https://e/2', 'status': 'mismatch'}]
+    w = process_warnings(a)
+    assert any('失效/不符' in x for x in w)
+
+
+def test_process_warnings_verification_field_omitted_warns_not_run():
+    # 关键回归：完全省略 source_verification_done 不能静默跳过门控
+    from agent.store.db import process_warnings
+    a = _valid_analysis()
+    a['dimension_evidence'] = {d: [{'title': 't', 'url': f'https://e/{d}'}]
+                               for d in ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']}
+    a['process_metadata'] = {'ach_run': True}  # 无 source_verification_done 字段
+    w = process_warnings(a)
+    assert any('信源核验门控' in x and '未执行' in x for x in w)

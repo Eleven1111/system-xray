@@ -161,12 +161,17 @@ Researcher 的 prompt **不是**整份大文件，而是按需拼装——只给
 | P2 半覆盖 | Priority 2 视角中至少 50% 有有效信源 | 在 Brief 中标注 `⚠️ P2 COVERAGE GAP`，列出缺失视角 |
 | 中文信源覆盖 | 如启用中文查询，中文 P1 视角至少 50% 有信源 | 补充 Researcher 用替代中文信源站点重搜 |
 
-**⛔ 门控 C：信源核验（Source Verification）— 抽查**
+**⛔ 门控 C：信源核验（Source Verification）— 真跑，不只是声称**
 
-从所有 Researcher 返回的 sources 中随机抽取 2-3 条 T1/T2 信源，执行 WebFetch 检查：
-- URL 是否可访问（非 404/403）
-- 页面标题是否与 Researcher 报告的标题一致
-- 如抽查发现 ≥1 条虚假/不可达信源，对该 Researcher 的**全部结果**标注 `⚠️ UNVERIFIED`，并在 Brief 中降低对应视角置信度
+这是**内容可信度**门控：sub-agent 会吐出自信的错事实（如把 SNSC 秘书长张冠李戴）直接进报告，唯一能拦的就是真去核验。流程：
+
+1. **选样（工具，不靠拍脑袋）**：`python3 -m agent.agent --verify-plan --input /tmp/sx_brief.json --sample 4` —— 自动挑出最该核验的信源（T1/T2 优先，**承载定量声明的加权**：那些"39 处决/85% 票/-6.1%"式具体数字最该追一手）。
+2. **逐条 WebFetch**：对清单每条检查 ① URL 可达（非 404/403）；② 标题/关键数字与所述一致。判定 `confirmed` / `dead`（不可达）/ `mismatch`（标题或数字不符）/ `unverifiable`（如二进制 PDF 读不出、超时）。
+3. **记录**：把结果按 `[{"url","status","note"}]` 写回 brief 的 `source_verification`，并置 `process_metadata.source_verification_done=true`。**CLI 强制：声称 done 却无 source_verification 记录会告警；有 dead/mismatch 也告警。**
+4. **审计标注**：`--build-audit` 会据 `source_verification` 给信源打 ✓核实/✗失效/⚠不符/？未达 徽章，写进可读报告。
+5. 如发现 `mismatch`/`dead`：撤下或复核依赖该信源的结论；对应视角置信度下调。
+
+> 注：WebFetch 读不出二进制 PDF、可能超时——这类如实记 `unverifiable`，**不可冒充 confirmed**。
 
 **门控失败处理（统一）：**
 1. 向用户报告哪些门控未通过、具体原因

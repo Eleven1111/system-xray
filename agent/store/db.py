@@ -174,8 +174,19 @@ def process_warnings(analysis: dict) -> list[str]:
         warnings.append('⚠️ full 模式但 ACH（竞争假说检验）未运行——可能锚定首个叙事，存在确认偏差')
     if pm.get('round2_triggered') and not pm.get('round2_run'):
         warnings.append('⚠️ Round2 深度研究已触发但未运行——HIGH 矛盾/缺 T1 定量声明可能未求证')
-    if pm.get('source_verification_done') is False:
+    if not pm.get('source_verification_done'):   # False 或字段缺失都算未跑（堵 omission 漏洞）
         warnings.append('⚠️ 信源核验门控（WebFetch 抽查）未执行——存在虚假/不可达信源风险')
+    else:
+        # 声称已核验，必须有记录支撑，否则是空头承诺
+        sv = analysis.get('source_verification')
+        if not sv or not isinstance(sv, list):
+            warnings.append('⚠️ 声称已做信源核验，但缺 source_verification 记录——无法证明真核验过')
+        else:
+            bad = [v for v in sv if isinstance(v, dict) and str(v.get('status', '')).lower() in ('dead', 'mismatch')]
+            if bad:
+                warnings.append(
+                    f'⚠️ 信源核验发现 {len(bad)} 条失效/不符（dead/mismatch）——依赖这些信源的结论须复核或撤下'
+                )
 
     unresolved = pm.get('unresolved_high_contradictions')
     n_unresolved = unresolved if isinstance(unresolved, int) else (len(unresolved) if isinstance(unresolved, list) else 0)
@@ -718,19 +729,64 @@ def _esc(s) -> str:
     return (str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'))
 
 
-def build_source_audit_html(sources: list[dict]) -> str:
+def _tier_num(t) -> int:
+    if isinstance(t, int):
+        return t if t in (1, 2, 3) else 9
+    m = re.search(r'[123]', str(t))
+    return int(m.group()) if m else 9
+
+
+_HAS_NUMBER = re.compile(r'\d')
+
+
+def select_verification_sample(sources: list[dict], n: int = 3) -> list[dict]:
+    """
+    内容可信度（本轮）：从信源池中挑出**最该 WebFetch 抽查**的 n 条，供 Orchestrator 核验。
+
+    优先级：信源层级越高越优先（T1>T2>T3）；**承载定量声明（标题/摘录含数字）的信源额外加权**——
+    这些"权威感十足的具体数字"正是 sub-agent 最容易编错、最该追一手核验的（如"39 处决""85% 票"）。
+    去重(按 url)，仅取带 url 的。返回 [{title, url, tier, reason}]。
+    """
+    seen: set = set()
+    scored: list[tuple] = []
+    for s in sources or []:
+        if not isinstance(s, dict):
+            continue
+        url = (s.get('url') or '').strip()
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        tier = _tier_num(s.get('tier'))
+        tier_score = {1: 3, 2: 2, 3: 1}.get(tier, 0)
+        has_num = bool(_HAS_NUMBER.search((s.get('title') or '') + ' ' + (s.get('excerpt') or '')))
+        score = tier_score + (2 if has_num else 0)
+        reason = []
+        if tier <= 2:
+            reason.append(f'T{tier} 高权重信源' if tier in (1, 2) else '')
+        if has_num:
+            reason.append('含定量声明，需追一手核验')
+        scored.append((score, {'title': s.get('title', ''), 'url': url,
+                               'tier': tier, 'reason': '；'.join(r for r in reason if r) or '一般抽查'}))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [item for _, item in scored[:max(0, n)]]
+
+
+def build_source_audit_html(sources: list[dict], verifications: list[dict] | None = None) -> str:
     """
     P1：从 Researcher 返回的合并 sources[] 机械生成逐条 URL 的信源审计 HTML 片段。
 
     取代手写"信源类别"——审计直接由真实返回信源派生，每条含 标题/URL/日期，按 T 级分组。
     sources 每项形如 {query,title,url,excerpt,tier,date}。tier 可为 1/2/3 或 "T1"/"T2"/"T3"。
+
+    verifications（可选）：[{url, status}]，status ∈ confirmed|dead|mismatch|unverifiable。
+    提供时为对应信源加核验徽章（✓核实/✗失效/⚠不符/？未达），把"是否真核验过"写进可读报告。
     返回可直接嵌入报告正文的 <details>…</details> 字符串。
     """
-    def _tier_num(t) -> int:
-        if isinstance(t, int):
-            return t if t in (1, 2, 3) else 9
-        m = re.search(r'[123]', str(t))
-        return int(m.group()) if m else 9
+    vmap = {}
+    for v in verifications or []:
+        if isinstance(v, dict) and v.get('url'):
+            vmap[v['url'].strip()] = str(v.get('status', '')).lower()
+    badge = {'confirmed': '✓核实', 'dead': '✗失效', 'mismatch': '⚠不符', 'unverifiable': '？未达'}
 
     buckets: dict[int, list[dict]] = {1: [], 2: [], 3: [], 9: []}
     seen: set = set()
@@ -745,7 +801,9 @@ def build_source_audit_html(sources: list[dict]) -> str:
         buckets[_tier_num(s.get('tier'))].append(s)
 
     total = sum(len(v) for v in buckets.values())
-    lines = [f'<details>', f'<summary>信源审计（{total} 条，点击展开）</summary>', '<div class="content">']
+    n_verified = sum(1 for s in sum(buckets.values(), []) if (s.get('url') or '').strip() in vmap)
+    summary_extra = f'，已抽查核验 {n_verified} 条' if vmap else ''
+    lines = [f'<details>', f'<summary>信源审计（{total} 条{summary_extra}，点击展开）</summary>', '<div class="content">']
     tier_titles = {1: 'T1 · 官方/一手', 2: 'T2 · 机构媒体/分析', 3: 'T3 · 社区/间接', 9: '未分级'}
     for tier in (1, 2, 3, 9):
         items = buckets[tier]
@@ -757,8 +815,11 @@ def build_source_audit_html(sources: list[dict]) -> str:
             title = _esc(s.get('title') or '无标题')
             date = _esc(s.get('date') or '日期未知')
             url = (s.get('url') or '').strip()
+            mark = ''
+            if url in vmap:
+                mark = f' <strong>[{badge.get(vmap[url], vmap[url])}]</strong>'
             if url:
-                lines.append(f'<li><a href="{_esc(url)}">{title}</a> — {date}</li>')
+                lines.append(f'<li><a href="{_esc(url)}">{title}</a> — {date}{mark}</li>')
             else:
                 lines.append(f'<li>{title} — {date}（无 URL）</li>')
         lines.append('</ul>')

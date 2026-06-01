@@ -21,7 +21,7 @@ from agent.store.db import (
     list_analyses, load_latest, load_predictions,
     save_analysis, save_html_report, save_research_materials,
     save_to_obsidian, build_radar_svg, validate_analysis,
-    process_warnings, build_source_audit_html,
+    process_warnings, build_source_audit_html, select_verification_sample,
 )
 
 
@@ -132,7 +132,21 @@ def cmd_build_audit(args):
     """从文件/stdin 读取 Research Brief JSON（含 sources[]），输出逐条 URL 的信源审计 HTML 片段。"""
     brief = json.loads(_read_payload(args.input))
     sources = brief.get('sources', brief) if isinstance(brief, dict) else brief
-    print(build_source_audit_html(sources))
+    verifications = brief.get('source_verification') if isinstance(brief, dict) else None
+    print(build_source_audit_html(sources, verifications=verifications))
+
+
+def cmd_verify_plan(args):
+    """从 Brief JSON 选出最该 WebFetch 抽查的信源，输出核验清单（供 Orchestrator 执行）。"""
+    brief = json.loads(_read_payload(args.input))
+    sources = brief.get('sources', brief) if isinstance(brief, dict) else brief
+    n = args.sample if args.sample else 3
+    sample = select_verification_sample(sources, n=n)
+    print(f'# 信源核验清单（{len(sample)} 条，请逐条 WebFetch 核验：URL 可达？标题/数字与所述一致？）')
+    for i, s in enumerate(sample, 1):
+        print(f'{i}. [T{s["tier"]}] {s["title"]}\n   {s["url"]}\n   原因：{s["reason"]}')
+    print('\n# 核验后，把结果按 [{"url","status":"confirmed|dead|mismatch|unverifiable","note"}] '
+          '写回 brief 的 source_verification 字段，并置 process_metadata.source_verification_done=true')
 
 
 def cmd_save_materials(args):
@@ -214,6 +228,8 @@ def main():
     parser.add_argument('--validate',       action='store_true', help='仅校验 analysis JSON 结构，不落盘')
     parser.add_argument('--radar',          action='store_true', help='读取七维评分 JSON，输出雷达图 SVG')
     parser.add_argument('--build-audit',    action='store_true', help='读取 Brief JSON(含 sources[])，输出逐条 URL 信源审计 HTML 片段')
+    parser.add_argument('--verify-plan',     action='store_true', help='从 Brief JSON 选出最该 WebFetch 抽查的信源，输出核验清单')
+    parser.add_argument('--sample',          type=int, help='--verify-plan 抽查条数（默认 3）')
     parser.add_argument('--load-predictions', action='store_true', help='输出上次分析的预测列表 JSON')
     parser.add_argument('--load-latest',    action='store_true', help='输出上次分析的完整记录 JSON')
 
@@ -233,6 +249,10 @@ def main():
 
     if args.build_audit:
         cmd_build_audit(args)
+        return
+
+    if args.verify_plan:
+        cmd_verify_plan(args)
         return
 
     if args.history:
