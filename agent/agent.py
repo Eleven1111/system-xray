@@ -21,6 +21,7 @@ from agent.store.db import (
     list_analyses, load_latest, load_predictions,
     save_analysis, save_html_report, save_research_materials,
     save_to_obsidian, build_radar_svg, validate_analysis,
+    process_warnings, build_source_audit_html,
 )
 
 
@@ -100,26 +101,38 @@ def cmd_full_analysis(args):
 
 
 def cmd_validate(args):
-    """仅校验 analysis JSON 结构，不落盘。退出码 0=通过，1=有错误。"""
+    """仅校验 analysis JSON 结构，不落盘。退出码 0=通过(可含告警)，1=有硬错误。"""
     analysis = json.loads(_read_payload(args.input))
     errors = validate_analysis(analysis)
+    warnings = process_warnings(analysis)
+    for w in warnings:
+        print(w)
     if errors:
         print('❌ 校验失败：')
         for e in errors:
             print(f'  - {e}')
         sys.exit(1)
-    print('✅ 校验通过')
+    print('✅ 校验通过' + ('（含上述非阻塞告警）' if warnings else ''))
 
 
 def cmd_save_analysis(args):
-    """从文件/stdin 读取 analysis JSON 并持久化（落盘前自动校验）。"""
+    """从文件/stdin 读取 analysis JSON 并持久化（落盘前自动校验；流程告警非阻塞）。"""
     analysis = json.loads(_read_payload(args.input))
     try:
         path = save_analysis(args.system, args.type, analysis, date_str=args.date)
     except ValueError as e:
         print(str(e), file=sys.stderr)
         sys.exit(1)
+    for w in process_warnings(analysis):
+        print(w, file=sys.stderr)
     print(f'已保存到：{path}')
+
+
+def cmd_build_audit(args):
+    """从文件/stdin 读取 Research Brief JSON（含 sources[]），输出逐条 URL 的信源审计 HTML 片段。"""
+    brief = json.loads(_read_payload(args.input))
+    sources = brief.get('sources', brief) if isinstance(brief, dict) else brief
+    print(build_source_audit_html(sources))
 
 
 def cmd_save_materials(args):
@@ -200,6 +213,7 @@ def main():
     parser.add_argument('--save-md',        action='store_true', help='读取报告 Markdown 并保存为 Obsidian 备份')
     parser.add_argument('--validate',       action='store_true', help='仅校验 analysis JSON 结构，不落盘')
     parser.add_argument('--radar',          action='store_true', help='读取七维评分 JSON，输出雷达图 SVG')
+    parser.add_argument('--build-audit',    action='store_true', help='读取 Brief JSON(含 sources[])，输出逐条 URL 信源审计 HTML 片段')
     parser.add_argument('--load-predictions', action='store_true', help='输出上次分析的预测列表 JSON')
     parser.add_argument('--load-latest',    action='store_true', help='输出上次分析的完整记录 JSON')
 
@@ -215,6 +229,10 @@ def main():
 
     if args.radar:
         cmd_radar(args)
+        return
+
+    if args.build_audit:
+        cmd_build_audit(args)
         return
 
     if args.history:

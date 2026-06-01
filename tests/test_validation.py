@@ -209,3 +209,118 @@ def test_cli_save_html_handles_tricky_payload(tmp_path):
     assert '它说"X"' in html
     assert '`code`' in html
     assert "'''triple'''" in html
+
+
+# ── P1: build_source_audit_html ──
+
+def test_build_audit_itemizes_urls_by_tier():
+    from agent.store.db import build_source_audit_html
+    sources = [
+        {'title': '官方公告', 'url': 'https://gov.example/a', 'tier': 1, 'date': '2026-05-01'},
+        {'title': '路透报道', 'url': 'https://reuters.com/b', 'tier': 'T2', 'date': '2026-05-02'},
+        {'title': '推文', 'url': 'https://x.com/c', 'tier': 3, 'date': None},
+    ]
+    html = build_source_audit_html(sources)
+    assert '<details>' in html and '</details>' in html
+    assert 'https://gov.example/a' in html
+    assert 'href="https://reuters.com/b"' in html
+    assert 'T1' in html and 'T2' in html and 'T3' in html
+    assert '信源审计（3 条' in html
+
+
+def test_build_audit_dedupes_and_escapes():
+    from agent.store.db import build_source_audit_html
+    sources = [
+        {'title': 'A & <b>', 'url': 'https://e/x', 'tier': 1, 'date': '2026-01-01'},
+        {'title': '重复', 'url': 'https://e/x', 'tier': 1, 'date': '2026-01-01'},  # 同 URL 去重
+    ]
+    html = build_source_audit_html(sources)
+    assert html.count('https://e/x') == 1       # 去重
+    assert '&amp;' in html and '&lt;b&gt;' in html  # 转义
+
+
+# ── P2: process_warnings (non-blocking) ──
+
+def test_process_warnings_missing_metadata():
+    from agent.store.db import process_warnings
+    w = process_warnings(_valid_analysis())
+    assert any('process_metadata' in x for x in w)
+
+
+def test_process_warnings_flags_skipped_ach_and_round2():
+    from agent.store.db import process_warnings
+    a = _valid_analysis()
+    a['process_metadata'] = {'ach_run': False, 'round2_triggered': True, 'round2_run': False,
+                             'source_verification_done': True}
+    w = process_warnings(a)
+    assert any('ACH' in x for x in w)
+    assert any('Round2' in x for x in w)
+
+
+def test_process_warnings_confidence_ceiling():
+    from agent.store.db import process_warnings
+    a = _valid_analysis()
+    a['process_metadata'] = {'ach_run': True, 'unresolved_high_contradictions': 2,
+                             'confidence_label': 'high'}
+    w = process_warnings(a)
+    assert any('封顶' in x or 'partial' in x for x in w)
+
+
+def test_process_warnings_clean_when_all_good():
+    from agent.store.db import process_warnings
+    a = _valid_analysis()
+    a['process_metadata'] = {'ach_run': True, 'round2_triggered': False, 'round2_run': False,
+                             'source_verification_done': True, 'unresolved_high_contradictions': 0}
+    a['dimension_evidence'] = {d: [{'title': 't', 'url': f'https://e/{d}'}]
+                               for d in ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']}
+    assert process_warnings(a) == []
+
+
+def test_process_warnings_flags_missing_dimension_evidence():
+    # dimension_evidence 缺失须被点名；且两块都缺时，该警告不能被 pm 早返回吞掉
+    from agent.store.db import process_warnings
+    a = _valid_analysis()  # 无 dimension_evidence、无 process_metadata
+    w = process_warnings(a)
+    assert any('dimension_evidence' in x for x in w)
+    assert any('process_metadata' in x for x in w)
+
+
+# ── P3: dimension_evidence strict-when-present ──
+
+def test_dimension_evidence_present_and_valid_passes():
+    from agent.store.db import validate_analysis
+    a = _valid_analysis()
+    a['dimension_evidence'] = {
+        d: [{'title': 't', 'url': f'https://e/{d}'}] for d in
+        ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']
+    }
+    assert validate_analysis(a) == []
+
+
+def test_dimension_evidence_missing_url_rejected():
+    from agent.store.db import validate_analysis
+    a = _valid_analysis()
+    a['dimension_evidence'] = {
+        d: [{'title': 't', 'url': f'https://e/{d}'}] for d in
+        ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']
+    }
+    a['dimension_evidence']['D6'] = [{'title': '无链接'}]  # 缺 url
+    errors = validate_analysis(a)
+    assert any('D6' in e for e in errors)
+
+
+def test_dimension_evidence_absent_is_not_error():
+    from agent.store.db import validate_analysis
+    assert validate_analysis(_valid_analysis()) == []  # 不带 dimension_evidence 仍通过
+
+
+# ── CLI: --build-audit ──
+
+def test_cli_build_audit_via_stdin():
+    brief = {'sources': [{'title': 'X', 'url': 'https://e/1', 'tier': 1, 'date': '2026-05-01'}]}
+    r = subprocess.run(
+        [sys.executable, '-m', 'agent.agent', '--build-audit'],
+        cwd=str(ROOT), input=json.dumps(brief), capture_output=True, text=True,
+    )
+    assert r.returncode == 0
+    assert 'https://e/1' in r.stdout and '<details>' in r.stdout

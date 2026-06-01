@@ -76,6 +76,8 @@ def validate_analysis(analysis: dict) -> list[str]:
       - overall_score（如有）: 1-5 数字
       - predictions / candidate_predictions（如有）: 字段完整、time_horizon 绝对日期、
         confidence ∈ [0,1]、dimension_link 属 D1-D7、source_step 合法枚举
+      - dimension_evidence（如有，P3）: 每个有评分的维度须挂 ≥1 条带 url 的信源
+        （present→严格校验；absent→不拦截，由 process_warnings 提醒）
     """
     errors: list[str] = []
     if not isinstance(analysis, dict):
@@ -118,7 +120,72 @@ def validate_analysis(analysis: dict) -> list[str]:
     if 'candidate_predictions' in analysis:
         errors.extend(_validate_predictions(analysis['candidate_predictions'], 'candidate_predictions'))
 
+    # P3：dimension_evidence 当存在时严格校验——每个有评分的维度须挂 ≥1 条带 url 的信源
+    dim_ev = analysis.get('dimension_evidence')
+    if dim_ev is not None:
+        if not isinstance(dim_ev, dict):
+            errors.append(f'dimension_evidence 必须是对象，实际为 {type(dim_ev).__name__}')
+        elif isinstance(scores, dict) and scores:
+            for dim in scores:
+                if dim not in _VALID_DIMS:
+                    continue
+                items = dim_ev.get(dim)
+                if not items or not isinstance(items, list):
+                    errors.append(f'dimension_evidence.{dim} 缺失或非数组（该维度有评分却无证据）')
+                    continue
+                if not any(isinstance(it, dict) and it.get('url') for it in items):
+                    errors.append(f'dimension_evidence.{dim} 无任何带 url 的信源（评分须可追溯）')
+
     return errors
+
+
+def process_warnings(analysis: dict) -> list[str]:
+    """
+    P2：流程门控核查（非阻塞）。返回告警字符串列表，空列表 = 无告警。
+
+    与 validate_analysis（硬拒绝结构错误）分离：这些是"流程被静默跳过"的提醒，
+    不阻止落盘，但在落盘时打印出来，把跳过变成被点名的显式决定。
+
+    依据 analysis 顶层的 `process_metadata` 块：
+      {round2_triggered, round2_run, ach_run, source_verification_done,
+       unresolved_high_contradictions, confidence_label}
+    """
+    warnings: list[str] = []
+    if not isinstance(analysis, dict):
+        return warnings
+
+    # 先查 dimension_evidence 缺失——必须在 process_metadata 早返回之前，
+    # 否则两块都缺时（最该被点名的情况）警告会被早返回吞掉。
+    scores = analysis.get('dimension_scores')
+    if 'dimension_evidence' not in analysis and isinstance(scores, dict) and scores:
+        warnings.append('⚠️ 缺 dimension_evidence：各维度评分未挂可追溯信源（P3，建议补记以保证可审计）')
+
+    pm = analysis.get('process_metadata')
+    if pm is None:
+        warnings.append('⚠️ 缺 process_metadata：无法核查 Round2/ACH/信源核验是否被跳过（建议补记）')
+        return warnings
+    if not isinstance(pm, dict):
+        warnings.append(f'⚠️ process_metadata 必须是对象，实际为 {type(pm).__name__}')
+        return warnings
+
+    mode = analysis.get('output_mode', 'full')
+    if mode == 'full' and pm.get('ach_run') is False:
+        warnings.append('⚠️ full 模式但 ACH（竞争假说检验）未运行——可能锚定首个叙事，存在确认偏差')
+    if pm.get('round2_triggered') and not pm.get('round2_run'):
+        warnings.append('⚠️ Round2 深度研究已触发但未运行——HIGH 矛盾/缺 T1 定量声明可能未求证')
+    if pm.get('source_verification_done') is False:
+        warnings.append('⚠️ 信源核验门控（WebFetch 抽查）未执行——存在虚假/不可达信源风险')
+
+    unresolved = pm.get('unresolved_high_contradictions')
+    n_unresolved = unresolved if isinstance(unresolved, int) else (len(unresolved) if isinstance(unresolved, list) else 0)
+    if n_unresolved > 0 and str(pm.get('confidence_label', '')).lower() == 'high':
+        warnings.append(
+            f'⚠️ 存在 {n_unresolved} 条未解决的 HIGH 矛盾，但置信度标为 high——置信度应封顶至 partial'
+        )
+
+    return warnings
+
+
 OBSIDIAN_DIR = Path('/Users/na/Library/Mobile Documents/iCloud~md~obsidian/Documents/System Pathology')
 
 
@@ -617,6 +684,59 @@ _HTML_TEMPLATE = dedent("""\
 </body>
 </html>
 """)
+
+
+def _esc(s) -> str:
+    """最小 HTML 转义。"""
+    return (str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'))
+
+
+def build_source_audit_html(sources: list[dict]) -> str:
+    """
+    P1：从 Researcher 返回的合并 sources[] 机械生成逐条 URL 的信源审计 HTML 片段。
+
+    取代手写"信源类别"——审计直接由真实返回信源派生，每条含 标题/URL/日期，按 T 级分组。
+    sources 每项形如 {query,title,url,excerpt,tier,date}。tier 可为 1/2/3 或 "T1"/"T2"/"T3"。
+    返回可直接嵌入报告正文的 <details>…</details> 字符串。
+    """
+    def _tier_num(t) -> int:
+        if isinstance(t, int):
+            return t if t in (1, 2, 3) else 9
+        m = re.search(r'[123]', str(t))
+        return int(m.group()) if m else 9
+
+    buckets: dict[int, list[dict]] = {1: [], 2: [], 3: [], 9: []}
+    seen: set = set()
+    for s in sources or []:
+        if not isinstance(s, dict):
+            continue
+        url = (s.get('url') or '').strip()
+        key = url or (s.get('title') or '').strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        buckets[_tier_num(s.get('tier'))].append(s)
+
+    total = sum(len(v) for v in buckets.values())
+    lines = [f'<details>', f'<summary>信源审计（{total} 条，点击展开）</summary>', '<div class="content">']
+    tier_titles = {1: 'T1 · 官方/一手', 2: 'T2 · 机构媒体/分析', 3: 'T3 · 社区/间接', 9: '未分级'}
+    for tier in (1, 2, 3, 9):
+        items = buckets[tier]
+        if not items:
+            continue
+        lines.append(f'<h4>{tier_titles[tier]}（{len(items)}）</h4>')
+        lines.append('<ul>')
+        for s in items:
+            title = _esc(s.get('title') or '无标题')
+            date = _esc(s.get('date') or '日期未知')
+            url = (s.get('url') or '').strip()
+            if url:
+                lines.append(f'<li><a href="{_esc(url)}">{title}</a> — {date}</li>')
+            else:
+                lines.append(f'<li>{title} — {date}（无 URL）</li>')
+        lines.append('</ul>')
+    lines.append('</div></details>')
+    return '\n'.join(lines)
 
 
 _DIMENSION_LABELS = {

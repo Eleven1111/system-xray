@@ -337,7 +337,7 @@ Agent(
 
 ### Step 4.5 — 竞争假说检验（ACH）
 
-**精简模式跳过此步。**
+**full 模式默认必做（P4），不得跳过**；仅精简模式可跳过。跳过 ACH 会锚定首个似真叙事、引入确认偏差。是否运行须如实记入 `process_metadata.ach_run`——full 模式记 false 会在落盘时被 CLI 告警点名。
 
 #### 4.5a — 假说生成
 
@@ -552,19 +552,29 @@ cd /Users/na/.claude/skills/system-xray
 python3 -m agent.agent --system "SYSTEM_NAME" --type SYSTEM_TYPE --save-analysis --input /tmp/sx_analysis.json
 ```
 
-**预测字段校验**（CLI 强制）：每条 `predictions` 必须含 `prediction` / `falsification_condition` / `time_horizon`（绝对日期 YYYY-MM-DD）/ `confidence`（0-1）/ `dimension_link`（D1-D7）/ `source_step`；`dimension_scores` 七维齐全且取值 1-5。若校验失败，按错误提示修正后重存。
+**analysis JSON 必含字段：**
+- `dimension_scores`（D1-D7，取值 1-5）、`overall_score`、`risk_nodes`、`predictions`
+- **`dimension_evidence`（P3）**：`{D1: [{title,url,date,tier}...], ...}`——每个有评分的维度挂 ≥1 条**带 url** 的信源。校验语义：**存在即严格**（某维列了却无 url → 硬拒存）；**完全缺失 → 非阻塞告警**（不硬拒，以兼容 6 维 legacy/精简模式重存，但会被 CLI 点名提醒补记）。把"评分须有信源"从口号变成可审计约束，并逼出更高单维证据密度。
+- **`process_metadata`（P2，强制记录）**：`{round2_triggered, round2_run, ach_run, source_verification_done, unresolved_high_contradictions, confidence_label}`——如实记录流程门控是否执行。CLI 会据此打印**非阻塞告警**（full 模式跳过 ACH / Round2 触发未跑 / 信源核验未做 / 有未解 HIGH 矛盾却标 high 置信）。告警不拦截落盘，但把"静默跳过"变成被点名的显式决定。
 
-> 也可在不落盘的情况下先自检：`python3 -m agent.agent --validate --input /tmp/sx_analysis.json`
+**校验（CLI 强制）**：每条 `predictions` 必须含 `prediction` / `falsification_condition` / `time_horizon`（绝对日期）/ `confidence`（0-1）/ `dimension_link`（D1-D7）/ `source_step`。硬错误拒存，流程告警照常落盘但打印。
+
+> 也可在不落盘的情况下先自检：`python3 -m agent.agent --validate --input /tmp/sx_analysis.json`（同时打印硬错误与流程告警）
 
 ---
 
-### Step 8 — 双输出：MD 素材 + HTML 智库报告
+### Step 8 — 三件套输出（缺一不算完成）：研究素材 MD + HTML 智库报告 + MD 备份
 
-本步骤同时生成两份输出，均保存到 Obsidian 仓库并列存放。
+本步骤必须生成**三份**输出并列存入 Obsidian，**缺一不算完成**：
+1. `研究素材.md`（Step 8a，原始信源逐条存档）— **不可跳过**
+2. `诊断报告.html`（Step 8b，含雷达图 + 逐条 URL 信源审计）
+3. `系统诊断.md`（Step 8c，Markdown 备份）
+
+**可追溯性硬约束（P1）**：HTML 报告的信源审计节**必须由 `--build-audit` 工具从真实返回信源机械生成**，逐条带 URL+日期，按 T 级分组——**禁止手写"信源类别"**（如只列"T2: 路透/FT/CNN"而无具体条目+链接）。这保证每个结论可点击核验。
 
 ---
 
-#### Step 8a — 保存 Research Brief 原始素材（MD 格式）
+#### Step 8a — 保存 Research Brief 原始素材（MD 格式，不可跳过）
 
 将 Step 4 的 Research Brief（含完整 sources、contradictions、coverage gaps）保存为 MD。先用 Write 工具把合并后的 brief JSON 写到临时文件，再走 CLI：
 
@@ -611,7 +621,7 @@ python3 -m agent.agent --system "SYSTEM_NAME" --type SYSTEM_TYPE --save-html --t
 | 低风险/健康 callout | `<div class="callout callout-green">...` |
 | 维度评分 N/5 | `<span class="score-badge score-N">N/5</span>` |
 | 表格 | `<table><thead>...<tbody>...`（自动 zebra stripe） |
-| 信源审计 | `<details><summary>信源审计（点击展开）</summary><div class="content">...</div></details>` |
+| 信源审计 | **不手写**——由 `--build-audit` 工具生成（见下），整段嵌入报告末尾 |
 | 七维雷达图 | `<div class="radar-container">` + 调用 `build_radar_svg()` 生成 |
 | 上期预测复盘（仅当 Step 3.6 有结果时） | `<div class="prediction-review"><h2>上期预测复盘</h2>` + 每条预测用 `<div class="callout callout-green/callout-red/callout-amber">` 包裹（✅confirmed=green, ❌falsified=red, ⏳pending=amber），内含原始预测、证据摘要、校准分数 |
 | 可证伪预测 | `<div class="predictions"><h2>可证伪预测</h2>` + 每条预测用 `<div class="prediction-card"><div class="prediction-title">{prediction}</div><div class="prediction-meta">证伪条件：{falsification_condition} ｜ 时间窗口：{time_horizon} ｜ 置信度：{confidence}</div><div class="prediction-link">关联维度：{dimension_link}</div></div>` |
@@ -627,6 +637,17 @@ python3 -m agent.agent --radar --input /tmp/sx_scores.json
 ```
 
 返回的 SVG 字符串直接嵌入 `<div class="radar-container">...</div>` 中。评分 JSON 用实际七维分值。
+
+**信源审计生成（P1，必须调用工具，不得手写）：**
+
+复用 Step 8a 的 brief JSON（含 `sources[]`），用 `--build-audit` 机械生成逐条 URL 的审计片段：
+
+```bash
+cd /Users/na/.claude/skills/system-xray
+python3 -m agent.agent --build-audit --input /tmp/sx_brief.json
+```
+
+返回的 `<details>…</details>` 整段直接拼到报告正文末尾（在 save-html 之前并入 `/tmp/sx_body.html`）。每条信源 `标题 — URL — 日期`，按 T1/T2/T3 分组、自动去重。
 
 ---
 
@@ -676,7 +697,7 @@ System Pathology/
 4. **表格 / callout 仅在必要时使用**：跨维度交互矩阵、演化情景概率、监控仪表板等结构化数据可用表格；风险警示可用 callout。但表格不是默认容器——如果信息可以用段落讲清楚，就用段落。
 5. **执行摘要**：用 `<div class="exec-summary">` 包裹，写成 3-5 句连贯的判断性陈述（非列表），点明核心诊断结论和最高风险。
 6. **章节标题简洁**：`<h2>` 对应大章节，`<h3>` 对应维度或子议题。标题本身不含评分——评分在正文首句。
-7. **信源审计独立折叠**：用 `<details><summary>` 放在报告末尾，完整列出所有信源，按 Tier 分组。
+7. **信源审计独立折叠**：放在报告末尾，**由 `--build-audit` 工具生成**（逐条 URL+日期，按 Tier 分组、去重），不手写类别。
 
 **完整模式（默认）：**
 上期预测复盘（仅当有历史预测验证结果时） → 执行摘要（散文） → 系统制图（散文 + 资源流图） → 七维诊断（每维 2-4 段散文 + 行内评分） → 交叉维度分析（散文 + 必要时用表格） → 关键风险节点（散文） → 演化情景与干预处方（散文 + 情景概率表） → 可证伪预测 → 监控仪表板（表格） → 信源审计（折叠）
@@ -694,3 +715,13 @@ System Pathology/
 - 分析矛盾的利益根源（谁的立场产生了这个叙事？）
 - 矛盾越多，置信度越低，在报告中显式标注
 - 禁止用训练知识"调和"两个互相矛盾的信源
+
+## 置信度天花板规则（P4）
+
+报告整体置信度（及 `process_metadata.confidence_label`）须受流程实况封顶，不得超报：
+- **Round 2 触发但未运行** → 置信度封顶 `partial`（HIGH 矛盾/缺 T1 定量声明未求证，不能声称 high）
+- **存在未解决的 HIGH 矛盾** → 不得标 `high`
+- **信源核验门控（WebFetch 抽查）未执行** → 在报告中显式声明"信源未抽样核验"
+- **数据来自训练截止之后的搜索** → 显式标注"基于搜索信源、未经训练知识独立验证"
+
+这些条件 CLI 会据 `process_metadata` 打印非阻塞告警；但封顶判断由你（Orchestrator）在写报告时主动执行。
