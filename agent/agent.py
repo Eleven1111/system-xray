@@ -22,6 +22,7 @@ from agent.store.db import (
     save_analysis, save_html_report, save_research_materials,
     save_to_obsidian, build_radar_svg, validate_analysis,
     process_warnings, build_source_audit_html, select_verification_sample,
+    triage_claims_for_factcheck,
 )
 
 
@@ -136,6 +137,20 @@ def cmd_build_audit(args):
     print(build_source_audit_html(sources, verifications=verifications))
 
 
+def cmd_triage_claims(args):
+    """从 analysis JSON 的 key_claims 分诊出最该独立 fact_check 的载荷性薄佐证断言。"""
+    analysis = json.loads(_read_payload(args.input))
+    kc = analysis.get('key_claims') if isinstance(analysis, dict) else analysis
+    n = args.sample if args.sample else 5
+    triaged = triage_claims_for_factcheck(kc or [], max_n=n)
+    if not triaged:
+        print('# 无需独立复核的载荷性薄佐证断言（或无 key_claims 账本）')
+        return
+    print(f'# 待独立复核断言（{len(triaged)} 条）——对每条派 fact_check sub-agent 重新求证（勿假设原结论成立）：')
+    for i, c in enumerate(triaged, 1):
+        print(f'{i}. 「{c["claim"]}」\n   支撑：{c["loads"]} ｜ {c["reason"]}（{c["n_sources"]}源/最高T{c["best_tier"]}）')
+
+
 def cmd_verify_plan(args):
     """从 Brief JSON 选出最该 WebFetch 抽查的信源，输出核验清单（供 Orchestrator 执行）。"""
     brief = json.loads(_read_payload(args.input))
@@ -229,7 +244,8 @@ def main():
     parser.add_argument('--radar',          action='store_true', help='读取七维评分 JSON，输出雷达图 SVG')
     parser.add_argument('--build-audit',    action='store_true', help='读取 Brief JSON(含 sources[])，输出逐条 URL 信源审计 HTML 片段')
     parser.add_argument('--verify-plan',     action='store_true', help='从 Brief JSON 选出最该 WebFetch 抽查的信源，输出核验清单')
-    parser.add_argument('--sample',          type=int, help='--verify-plan 抽查条数（默认 3）')
+    parser.add_argument('--triage-claims',   action='store_true', help='从 analysis JSON 分诊出最该独立 fact_check 的载荷性薄佐证断言')
+    parser.add_argument('--sample',          type=int, help='--verify-plan/--triage-claims 条数（默认 3/5）')
     parser.add_argument('--load-predictions', action='store_true', help='输出上次分析的预测列表 JSON')
     parser.add_argument('--load-latest',    action='store_true', help='输出上次分析的完整记录 JSON')
 
@@ -253,6 +269,10 @@ def main():
 
     if args.verify_plan:
         cmd_verify_plan(args)
+        return
+
+    if args.triage_claims:
+        cmd_triage_claims(args)
         return
 
     if args.history:

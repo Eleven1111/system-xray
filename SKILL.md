@@ -34,7 +34,7 @@ This skill has an `agent/` directory with full orchestrator-subagent infrastruct
 - `agent/prompts/researcher-modes.md` — 4 种 Round 2 模式：gap_filler / contradiction_resolution / data_anchor / prediction_verification（仅 Round 2 时按需粘贴对应节）
 - `agent/tools/query_generator.py` — 生成多视角查询集 + 并行批次分组（纯计算）
 - `agent/tools/history_compare.py` — 跨期维度评分对比 + 预测校准分数计算 + 历史类比匹配（纯计算）
-- `agent/store/db.py` — 持久化（JSON + MD素材 + HTML智库报告 + 雷达图SVG + 预测加载）+ 落盘校验（`validate_analysis`：维度/预测/`dimension_evidence` 强制）+ 流程告警（`process_warnings`：Round2/ACH/信源核验跳过非阻塞提醒）+ 信源审计生成（`build_source_audit_html`：逐条 URL + 核验徽章）+ 信源核验选样（`select_verification_sample`：挑最该 WebFetch 抽查的高权重/定量信源）
+- `agent/store/db.py` — 持久化（JSON + MD素材 + HTML智库报告 + 雷达图SVG + 预测加载）+ 落盘校验（`validate_analysis`：维度/预测/`dimension_evidence` 强制）+ 流程告警（`process_warnings`：Round2/ACH/信源核验跳过非阻塞提醒）+ 信源审计生成（`build_source_audit_html`：逐条 URL + 核验徽章）+ 信源核验选样（`select_verification_sample`：挑最该 WebFetch 抽查的高权重/定量信源）+ 综述类错误分诊（`triage_claims_for_factcheck`：挑载荷性∩薄佐证断言交独立 fact_check sub-agent 复核）
 - `agent/agent.py` — CLI 辅助工具（查询集预览、历史记录查看）
 
 ---

@@ -161,6 +161,28 @@ def process_warnings(analysis: dict) -> list[str]:
     if 'dimension_evidence' not in analysis and isinstance(scores, dict) and scores:
         warnings.append('⚠️ 缺 dimension_evidence：各维度评分未挂可追溯信源（P3，建议补记以保证可审计）')
 
+    # 关键断言账本（啃综述类错误）——同样置于 pm 早返回之前
+    kc = analysis.get('key_claims')
+    if kc is None and isinstance(scores, dict) and scores and analysis.get('output_mode', 'full') == 'full':
+        warnings.append('⚠️ 缺 key_claims 账本：未登记载荷性事实断言，无法分诊"综述类错误"（Zolghadr 类）做独立复核')
+    elif isinstance(kc, list):
+        for c in kc:
+            if not isinstance(c, dict) or not c.get('loads'):
+                continue
+            ic = c.get('independent_check')
+            status = str(ic.get('status', '')).lower() if isinstance(ic, dict) else ''
+            thin = _distinct_source_count(c.get('sources')) < 2 or _best_tier(c.get('sources')) == 3
+            short = (c.get('claim', '') or '')[:24]
+            if status == 'contradicted':
+                warnings.append(
+                    f'🛑 独立复核推翻了载荷性断言「{short}…」——依赖它的 {c.get("loads")} 须修订或撤下'
+                )
+            elif thin and status not in ('confirmed',):
+                warnings.append(
+                    f'⚠️ 载荷性断言「{short}…」佐证单薄（{_distinct_source_count(c.get("sources"))}源/最高T{_best_tier(c.get("sources"))}）且未独立复核——'
+                    f'支撑 {c.get("loads")}，建议派 fact_check 独立求证'
+                )
+
     pm = analysis.get('process_metadata')
     if pm is None:
         warnings.append('⚠️ 缺 process_metadata：无法核查 Round2/ACH/信源核验是否被跳过（建议补记）')
@@ -737,6 +759,65 @@ def _tier_num(t) -> int:
 
 
 _HAS_NUMBER = re.compile(r'\d')
+
+
+def _distinct_source_count(sources) -> int:
+    if not isinstance(sources, list):
+        return 0
+    return len({(s.get('url') or '').strip() for s in sources
+                if isinstance(s, dict) and (s.get('url') or '').strip()})
+
+
+def _best_tier(sources) -> int:
+    """返回支撑信源里最高的层级（数字最小=最高）；无则 9。"""
+    tiers = [_tier_num(s.get('tier')) for s in sources if isinstance(s, dict)] if isinstance(sources, list) else []
+    return min(tiers) if tiers else 9
+
+
+def triage_claims_for_factcheck(key_claims: list[dict], max_n: int = 5) -> list[dict]:
+    """
+    啃硬骨头（综述类错误）：从关键断言账本里挑出**最该独立复核**的断言。
+
+    这是**触发器/分诊**，不是"catch"本身——真正抓错的是独立 fact_check sub-agent 的
+    重新求证（见 researcher-modes.md `fact_check`）。本函数只决定哪些断言值得那次昂贵的复核。
+
+    "载荷性"按**后果**定义：断言的 `loads` 非空（支撑了某维度评分/风险节点/预测）。
+    "薄佐证"：去重信源 < 2，或最高层级仅 T3。
+    分诊集 = 载荷性 ∩ 薄佐证 ∩ 尚未独立复核，按 loads 多少（影响面）降序，截断 max_n。
+
+    ⚠️ 局限：账本由同一个可能犯错的流程自报——信源计数是**下限不是真相**
+    （2 个源可能都不支撑该断言、或同源转载）。分诊浮出的是"佐证单薄"的断言，
+    与"错误"断言**重叠但不等同**。
+    """
+    triaged = []
+    for c in key_claims or []:
+        if not isinstance(c, dict):
+            continue
+        loads = c.get('loads')
+        if not loads:                       # 不载荷任何诊断元素 → 噪音，跳过
+            continue
+        ic = c.get('independent_check')
+        if isinstance(ic, dict) and str(ic.get('status', '')).lower() in ('confirmed', 'contradicted'):
+            continue                        # 已独立复核过
+        srcs = c.get('sources')
+        thin = _distinct_source_count(srcs) < 2 or _best_tier(srcs) == 3
+        if not thin:
+            continue
+        reason = []
+        if _distinct_source_count(srcs) < 2:
+            reason.append('单一信源')
+        if _best_tier(srcs) == 3:
+            reason.append('仅 T3 支撑')
+        triaged.append({
+            'claim': c.get('claim', ''),
+            'loads': loads,
+            'n_sources': _distinct_source_count(srcs),
+            'best_tier': _best_tier(srcs),
+            'reason': '；'.join(reason),
+            'stakes': len(loads) if isinstance(loads, list) else 1,
+        })
+    triaged.sort(key=lambda x: x['stakes'], reverse=True)
+    return triaged[:max(0, max_n)]
 
 
 def select_verification_sample(sources: list[dict], n: int = 3) -> list[dict]:

@@ -274,6 +274,9 @@ def test_process_warnings_clean_when_all_good():
     a['dimension_evidence'] = {d: [{'title': 't', 'url': f'https://e/{d}'}]
                                for d in ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']}
     a['source_verification'] = [{'url': 'https://e/D1', 'status': 'confirmed'}]
+    a['key_claims'] = [{'claim': '良好佐证的断言', 'loads': ['D1'],
+                        'sources': [{'url': 'https://a/1', 'tier': 1},
+                                    {'url': 'https://b/2', 'tier': 2}]}]  # 多源高tier → 不触发
     assert process_warnings(a) == []
 
 
@@ -419,3 +422,67 @@ def test_process_warnings_verification_field_omitted_warns_not_run():
     a['process_metadata'] = {'ach_run': True}  # 无 source_verification_done 字段
     w = process_warnings(a)
     assert any('信源核验门控' in x and '未执行' in x for x in w)
+
+
+# ── 综述类错误：claims ledger triage + 独立复核告警 ──
+
+def _claim(claim, loads, sources, ic=None):
+    c = {'claim': claim, 'loads': loads, 'sources': sources}
+    if ic:
+        c['independent_check'] = ic
+    return c
+
+
+def test_triage_flags_loadbearing_single_t3_claim():
+    # Zolghadr 类：载荷性 + 单一 T3 源 → 必须进分诊
+    from agent.store.db import triage_claims_for_factcheck
+    claims = [
+        _claim('SNSC 秘书长是 X', ['D7'], [{'url': 'https://t3/1', 'tier': 3}]),  # 载荷+单T3
+        _claim('GDP -6.1%', ['D2'], [{'url': 'https://a/1', 'tier': 2}, {'url': 'https://b/2', 'tier': 1}]),  # 多源高tier
+        _claim('无关琐事', [], [{'url': 'https://t3/9', 'tier': 3}]),  # 不载荷 → 噪音
+    ]
+    t = triage_claims_for_factcheck(claims)
+    claims_out = [x['claim'] for x in t]
+    assert 'SNSC 秘书长是 X' in claims_out      # 进分诊
+    assert 'GDP -6.1%' not in claims_out         # 佐证充分，不进
+    assert '无关琐事' not in claims_out           # 不载荷，不进
+
+
+def test_triage_skips_already_checked_and_caps():
+    from agent.store.db import triage_claims_for_factcheck
+    claims = [_claim(f'c{i}', ['D1'], [{'url': f'https://t/{i}', 'tier': 3}]) for i in range(8)]
+    claims[0]['independent_check'] = {'status': 'confirmed'}  # 已复核 → 跳过
+    t = triage_claims_for_factcheck(claims, max_n=5)
+    assert len(t) == 5
+    assert 'c0' not in [x['claim'] for x in t]
+
+
+def test_triage_orders_by_stakes():
+    from agent.store.db import triage_claims_for_factcheck
+    claims = [
+        _claim('low', ['D1'], [{'url': 'https://t/1', 'tier': 3}]),
+        _claim('high', ['D1', 'D7', 'risk_node:1'], [{'url': 'https://t/2', 'tier': 3}]),
+    ]
+    t = triage_claims_for_factcheck(claims)
+    assert t[0]['claim'] == 'high'   # loads 多 → 优先
+
+
+def test_process_warnings_contradicted_claim_is_strong():
+    from agent.store.db import process_warnings
+    a = _valid_analysis()
+    a['dimension_evidence'] = {d: [{'title': 't', 'url': f'https://e/{d}'}]
+                               for d in ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']}
+    a['process_metadata'] = {'ach_run': True, 'source_verification_done': True}
+    a['source_verification'] = [{'url': 'https://e/D1', 'status': 'confirmed'}]
+    a['key_claims'] = [_claim('SNSC 秘书长是 BadName', ['D7'],
+                              [{'url': 'https://t3/x', 'tier': 3}],
+                              ic={'status': 'contradicted', 'note': '应为 Zolghadr'})]
+    w = process_warnings(a)
+    assert any('推翻' in x and 'D7' in x for x in w)
+
+
+def test_process_warnings_missing_key_claims_nudge():
+    from agent.store.db import process_warnings
+    a = _valid_analysis()  # full 模式、无 key_claims
+    w = process_warnings(a)
+    assert any('key_claims' in x for x in w)
