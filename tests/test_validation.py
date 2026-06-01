@@ -324,3 +324,29 @@ def test_cli_build_audit_via_stdin():
     )
     assert r.returncode == 0
     assert 'https://e/1' in r.stdout and '<details>' in r.stdout
+
+
+# ── P6b: freshness / staleness warnings ──
+
+def test_process_warnings_staleness_gap():
+    from agent.store.db import process_warnings
+    a = _valid_analysis()
+    a['dimension_evidence'] = {d: [{'title': 't', 'url': f'https://e/{d}'}]
+                               for d in ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']}
+    a['process_metadata'] = {'ach_run': True, 'source_verification_done': True,
+                             'latest_source_date': '2026-05-20', 'as_of_date': '2026-06-01',
+                             'breaking_event_sweep_done': True}
+    w = process_warnings(a)
+    assert any('信息滞后' in x for x in w)
+
+
+def test_process_warnings_breaking_event_sweep_skipped():
+    from agent.store.db import process_warnings
+    a = _valid_analysis()
+    a['dimension_evidence'] = {d: [{'title': 't', 'url': f'https://e/{d}'}]
+                               for d in ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']}
+    a['process_metadata'] = {'ach_run': True, 'source_verification_done': True,
+                             'latest_source_date': '2026-06-01', 'as_of_date': '2026-06-01',
+                             'breaking_event_sweep_done': False}
+    w = process_warnings(a)
+    assert any('突发事件扫描' in x for x in w)

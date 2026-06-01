@@ -700,9 +700,11 @@ If the user asks to compare two systems, use the same seven-dimensional framewor
 - 高置信（≥0.8）预测落空会被 `high_confidence_misses` 标记为特别警示
 
 **校准指标：**
-- Brier score（置信度加权，≥3 条已验证预测时计算）
+- Brier score（置信度加权，**仅在真正到期裁定的预测 ≥3 条时计算**）
 - 高置信落空率（高于低置信落空更值得关注）
 - 命中率（raw accuracy，仅作参考）
+
+**⏳ 时序铁律（P6a）：** 一条"X 持续到 time_horizon"的预测，**到期前不可能判 confirmed**（在 D 之前随时还能破），只能 `falsified`（已破）/ `on_track`（一致但未到期）/ `pending`。`calculate_prediction_accuracy(as_of_date=...)` 会把窗口未到的 confirmed 自动降级为 on_track、**不计入 Brier**——杜绝用未到期预测刷出虚假校准（曾把 5 条全未到期的预测算出"命中率 100%/Brier 0.098"的假象）。
 
 ---
 

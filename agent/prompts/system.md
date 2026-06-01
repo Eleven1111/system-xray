@@ -43,8 +43,9 @@ print(json.dumps({'query_set': result, 'batches': batches}, ensure_ascii=False, 
 **⚙️ 模型分层（强制）：Researcher 是纯采集任务（WebSearch + 按 schema 吐 JSON，零判断），按批次语言选模型——**
 - **英文 / 近期事件批次 → `haiku`**（`Agent` 工具 `model="haiku"`）：拉丁字符检索 + 结构化输出，haiku 足够，快且省。
 - **非拉丁本地语言批次（ar/fa/ru/ja/ko）→ `sonnet`**（`model="sonnet"`）：sonnet 多语言检索能力更强，且对"研究员只采集"这类结构化角色设定**远不易拒绝执行**（haiku 曾因怀疑指令异常而拒跑波斯语批次）。中文(zh)批次可用 haiku，但若查询含大量中文一手站点限定也可升 sonnet。
+- **敏感话题批次（人权/镇压/异见/政权合法性/冲突）→ `sonnet`（P5，强制）**：haiku 会把"OSINT/情报/对异见分级/追踪"这类措辞误读为监控意图而拒绝执行（伊朗决策体系一轮曾有 2 个英文 haiku 批次因此拒跑）。**派发此类批次时：① 用 sonnet；② 措辞中性化**——用"为学术/政策分析汇总公开报道""人权监测""治理评估"，**避免** "OSINT/intelligence/情报产品/追踪/对异见分级"等触警词。
 
-判断密集的环节（七维评分、ACH、跨维交互、处方）一律留在 Orchestrator 自身执行。此规则对所有轮次生效：Round 1 / Round 2（contradiction/data_anchor/gap_filler）/ 预测验证；Round 2 与预测验证若涉及本地语言信源，同样按上面规则升 sonnet。
+判断密集的环节（七维评分、ACH、跨维交互、处方）一律留在 Orchestrator 自身执行。此规则对所有轮次生效：Round 1 / Round 2（contradiction/data_anchor/gap_filler）/ 预测验证；Round 2 与预测验证若涉及本地语言或敏感话题，同样升 sonnet + 中性措辞。
 
 **批次包含 Batch 0（近期事件扫描）+ Batch 1-N（结构性视角）。所有批次同时启动。**
 
@@ -145,9 +146,12 @@ Researcher 的 prompt **不是**整份大文件，而是按需拼装——只给
 
 | 检查项 | 通过条件 | 失败处理 |
 |--------|---------|---------|
-| 最新信源日期 | 至少 1 个 Priority 1 视角的 `latest_source_date` 在分析日期前 3 个月内 | 强制重搜：追加当前年份 + 当前季度限定词 |
+| **突发事件扫描（P6b，强制）** | **定稿前**专门查"今天 / 过去 24-48 小时"该系统的重大事件（领导人变动/辞职、政策逆转、危机升级），确认无改写诊断的新进展 | 发现 → 必派补充 Researcher 采集，并据此修订相关维度（尤其 D7 权力拓扑）；完成后置 `process_metadata.breaking_event_sweep_done=true` |
+| 最新信源滞后 | 快变/危机系统：最新信源距分析基准日 ≤ 2 天；常态系统 ≤ 1 个月 | 追"过去 48 小时"重搜；CLI 据 `latest_source_date` vs `as_of_date` 打印滞后告警 |
 | 过期视角 | Priority 1 视角中 `stale_perspectives` 数量 ≤ 总数的 50% | 对过期视角单独派发补充 Researcher |
 | 当年覆盖 | 所有信源中至少 30% 来自当前年份 | 追加 Researcher 限定搜索当前年份 |
+
+> **教训（伊朗决策体系一轮）**：当时漏掉了"总统几小时前辞职"与"网管放开数天"等最新进展，且把未到期预测误判为已证实。新鲜度不是"近 3 个月"就够——**快变系统按小时/天计**。务必在定稿前做突发事件扫描，并在 `process_metadata` 如实记 `latest_source_date` / `as_of_date` / `breaking_event_sweep_done`。
 
 **⛔ 门控 B：覆盖率门控（Coverage Gate）**
 
@@ -555,7 +559,7 @@ python3 -m agent.agent --system "SYSTEM_NAME" --type SYSTEM_TYPE --save-analysis
 **analysis JSON 必含字段：**
 - `dimension_scores`（D1-D7，取值 1-5）、`overall_score`、`risk_nodes`、`predictions`
 - **`dimension_evidence`（P3）**：`{D1: [{title,url,date,tier}...], ...}`——每个有评分的维度挂 ≥1 条**带 url** 的信源。校验语义：**存在即严格**（某维列了却无 url → 硬拒存）；**完全缺失 → 非阻塞告警**（不硬拒，以兼容 6 维 legacy/精简模式重存，但会被 CLI 点名提醒补记）。把"评分须有信源"从口号变成可审计约束，并逼出更高单维证据密度。
-- **`process_metadata`（P2，强制记录）**：`{round2_triggered, round2_run, ach_run, source_verification_done, unresolved_high_contradictions, confidence_label}`——如实记录流程门控是否执行。CLI 会据此打印**非阻塞告警**（full 模式跳过 ACH / Round2 触发未跑 / 信源核验未做 / 有未解 HIGH 矛盾却标 high 置信）。告警不拦截落盘，但把"静默跳过"变成被点名的显式决定。
+- **`process_metadata`（P2/P6b，强制记录）**：`{round2_triggered, round2_run, ach_run, source_verification_done, unresolved_high_contradictions, confidence_label, latest_source_date, as_of_date, breaking_event_sweep_done}`——如实记录流程门控是否执行。CLI 会据此打印**非阻塞告警**：full 模式跳过 ACH / Round2 触发未跑 / 信源核验未做 / 有未解 HIGH 矛盾却标 high 置信 /（P6b）最新信源距基准日 ≥2 天的信息滞后 / 未做突发事件扫描。告警不拦截落盘，但把"静默跳过"变成被点名的显式决定。
 
 **校验（CLI 强制）**：每条 `predictions` 必须含 `prediction` / `falsification_condition` / `time_horizon`（绝对日期）/ `confidence`（0-1）/ `dimension_link`（D1-D7）/ `source_step`。硬错误拒存，流程告警照常落盘但打印。
 

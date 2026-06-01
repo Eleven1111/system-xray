@@ -148,7 +148,8 @@ def process_warnings(analysis: dict) -> list[str]:
 
     依据 analysis 顶层的 `process_metadata` 块：
       {round2_triggered, round2_run, ach_run, source_verification_done,
-       unresolved_high_contradictions, confidence_label}
+       unresolved_high_contradictions, confidence_label,
+       latest_source_date, as_of_date, breaking_event_sweep_done}  # P6b 新鲜度字段
     """
     warnings: list[str] = []
     if not isinstance(analysis, dict):
@@ -183,7 +184,33 @@ def process_warnings(analysis: dict) -> list[str]:
             f'⚠️ 存在 {n_unresolved} 条未解决的 HIGH 矛盾，但置信度标为 high——置信度应封顶至 partial'
         )
 
+    # P6b 新鲜度：最新信源距分析基准日的滞后 + 突发事件扫描
+    latest = _parse_date(pm.get('latest_source_date'))
+    as_of = _parse_date(pm.get('as_of_date')) or _parse_date(analysis.get('analysis_date'))
+    if latest and as_of:
+        gap = (as_of - latest).days
+        if gap >= 2:
+            warnings.append(
+                f'⚠️ 信息滞后：最新信源({pm.get("latest_source_date")})距分析基准({pm.get("as_of_date") or analysis.get("analysis_date")}) {gap} 天——'
+                f'快变系统应追"过去 48 小时/今天"再定稿，当前可能漏掉最新事件'
+            )
+    if pm.get('breaking_event_sweep_done') is False:
+        warnings.append('⚠️ 未做突发事件扫描（定稿前未查"今天/过去 24-48 小时"重大事件）——可能漏掉改写诊断的最新进展')
+
     return warnings
+
+
+def _parse_date(s):
+    """解析 YYYY-MM-DD / YYYYMMDD 为 datetime；失败返回 None。"""
+    if not s:
+        return None
+    digits = str(s).replace('-', '').replace('/', '')
+    if len(digits) < 8:
+        return None
+    try:
+        return datetime(int(digits[:4]), int(digits[4:6]), int(digits[6:8]))
+    except ValueError:
+        return None
 
 
 OBSIDIAN_DIR = Path('/Users/na/Library/Mobile Documents/iCloud~md~obsidian/Documents/System Pathology')

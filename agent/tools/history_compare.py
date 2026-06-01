@@ -3,14 +3,28 @@ Tool: 历史对比 + 预测校准 + 历史类比匹配（纯计算）
 
 比较同一系统的两次分析，输出各维度评分变化和趋势警告。
 计算历史预测的校准分数（Brier score）。
-基于七维评分向量进行历史类比匹配（余弦相似度）。
+基于七维评分向量进行历史类比匹配（量级敏感的欧氏度量）。
 """
 
 import json
 import math
+from datetime import datetime
 from pathlib import Path
 
 from agent.store.db import load_latest
+
+
+def _parse_ymd(s) -> datetime | None:
+    """解析 YYYY-MM-DD 或 YYYYMMDD；失败返回 None。"""
+    if not s:
+        return None
+    digits = str(s).replace('-', '').replace('/', '')
+    if len(digits) < 8:
+        return None
+    try:
+        return datetime(int(digits[:4]), int(digits[4:6]), int(digits[6:8]))
+    except ValueError:
+        return None
 
 _CASES_PATH = Path(__file__).resolve().parent.parent.parent / 'references' / 'analogy-cases.json'
 _CASES_CACHE: list[dict] | None = None
@@ -113,37 +127,50 @@ def compare_history(system_name: str, current: dict, previous: dict | None = Non
     }
 
 
-def calculate_prediction_accuracy(verification_results: list[dict]) -> dict:
+def calculate_prediction_accuracy(verification_results: list[dict], as_of_date: str | None = None) -> dict:
     """
-    从预测验证结果计算校准分数。
+    从预测验证结果计算校准分数——**时序感知**（修正"提前确认"谬误）。
+
+    核心规则：一条"X 持续到 time_horizon"的预测，在 horizon 到期**之前不可能被证实**
+    （在 D 之前随时还能破），只可能被**证伪**（条件已破）。因此：
+      - verification_result='confirmed' 但 as_of_date < time_horizon → 降级为 on_track（未决，不计入 Brier）
+      - verification_result='confirmed' 且 as_of_date >= time_horizon → 真正 resolved
+      - verification_result='falsified' → 任何时候都算 resolved（提前证伪合法）
+      - 'on_track' / 'pending' → 未决
+    Brier 仅在真正 resolved（confirmed-到期 + falsified）≥ 3 时计算，避免用未到期预测刷出假校准。
+
+    注：本规则假设预测为**持续型**（"X 持续到 D"→ 到期才能 confirm、可提前 falsify）。
+    若为**发生型**（"X 在 D 前发生"→ 可提前 confirm、到期才能 falsify），逻辑需反转；
+    当前会把发生型的提前成真保守降级为 on_track（少计 confirm，不会危险地多计）。
 
     参数：
-      verification_results: Researcher 返回的 prediction_verification JSON 列表，每条含：
-        - verification_result: "confirmed" | "falsified" | "pending"
-        - original_prediction: {confidence: float}
-        - updated_probability: float (仅 pending)
+      verification_results: 每条含 verification_result、original_prediction:{confidence,prediction}、
+                            time_horizon（或 original_prediction.time_horizon）
+      as_of_date: 评估基准日（YYYY-MM-DD/YYYYMMDD），默认今天
 
-    返回：
-      {
-        total: int,
-        confirmed_count: int,
-        falsified_count: int,
-        pending_count: int,
-        brier_score: float | None,   (仅 confirmed+falsified ≥ 3 时计算)
-        high_confidence_misses: [{prediction, confidence}],  (confidence ≥ 0.7 且 falsified)
-        summary: str,
-      }
+    返回：{total, confirmed_count, falsified_count, on_track_count, pending_count,
+           brier_score|None, high_confidence_misses, reclassified_early_confirmed, summary}
     """
-    confirmed = []
-    falsified = []
-    pending = []
+    as_of = _parse_ymd(as_of_date) or datetime.now()
+
+    confirmed, falsified, on_track, pending = [], [], [], []
+    reclassified = 0
 
     for r in verification_results:
         result = r.get('verification_result', 'pending')
-        if result == 'confirmed':
-            confirmed.append(r)
-        elif result == 'falsified':
+        horizon = r.get('time_horizon') or r.get('original_prediction', {}).get('time_horizon')
+        hz = _parse_ymd(horizon)
+        if result == 'falsified':
             falsified.append(r)
+        elif result == 'confirmed':
+            if hz is not None and as_of >= hz:
+                confirmed.append(r)
+            else:
+                # 时序谬误防护：窗口未到，"证实"无效，按 on_track 计（不进 Brier）
+                reclassified += 1
+                on_track.append(r)
+        elif result == 'on_track':
+            on_track.append(r)
         else:
             pending.append(r)
 
@@ -166,33 +193,44 @@ def calculate_prediction_accuracy(verification_results: list[dict]) -> dict:
         if r.get('original_prediction', {}).get('confidence', 0) >= 0.7
     ]
 
-    n_confirmed = len(confirmed)
-    n_falsified = len(falsified)
-    n_pending = len(pending)
-    total = n_confirmed + n_falsified + n_pending
+    n_conf, n_fals, n_track, n_pend = len(confirmed), len(falsified), len(on_track), len(pending)
+    total = n_conf + n_fals + n_track + n_pend
 
     if total == 0:
         summary = '无历史预测可验证'
     elif len(resolved) == 0:
-        summary = f'{n_pending} 条预测尚未到期'
+        parts = ['尚无到期可裁定的预测（Brier 不计算）']
+        if n_track:
+            parts.append(f'{n_track} 条进行中(on_track)')
+        if n_pend:
+            parts.append(f'{n_pend} 条待验证')
+        if reclassified:
+            parts.append(f'⚠️ {reclassified} 条"提前确认"已按未到期降级')
+        summary = '，'.join(parts)
     else:
-        accuracy = n_confirmed / len(resolved) * 100
-        parts = [f'命中率 {accuracy:.0f}%（{n_confirmed}/{len(resolved)}）']
+        accuracy = n_conf / len(resolved) * 100
+        parts = [f'命中率 {accuracy:.0f}%（{n_conf}/{len(resolved)} 已到期）']
         if brier_score is not None:
             parts.append(f'Brier 分数 {brier_score:.3f}')
         if high_conf_misses:
             parts.append(f'⚠️ {len(high_conf_misses)} 条高置信预测落空')
-        if n_pending > 0:
-            parts.append(f'{n_pending} 条待验证')
+        if n_track:
+            parts.append(f'{n_track} 条进行中')
+        if n_pend:
+            parts.append(f'{n_pend} 条待验证')
+        if reclassified:
+            parts.append(f'⚠️ {reclassified} 条"提前确认"已降级')
         summary = '，'.join(parts)
 
     return {
         'total': total,
-        'confirmed_count': n_confirmed,
-        'falsified_count': n_falsified,
-        'pending_count': n_pending,
+        'confirmed_count': n_conf,
+        'falsified_count': n_fals,
+        'on_track_count': n_track,
+        'pending_count': n_pend,
         'brier_score': brier_score,
         'high_confidence_misses': high_conf_misses,
+        'reclassified_early_confirmed': reclassified,
         'summary': summary,
     }
 

@@ -140,22 +140,30 @@ prediction: {
 }
 ```
 
+**⏳ 时序规则（关键，必须遵守）：** 一条"X 持续到 `time_horizon`"的预测，在 horizon 到期**之前不可能判 `confirmed`**——因为在那天之前条件随时还能破。到期前只有三种合法结论：
+- `falsified`：falsification_condition **已经**发生（提前证伪任何时候都合法）
+- `on_track`：当前证据与预测一致、但窗口未到，**不算证实**
+- `pending`：尚无决定性证据
+**只有当 today ≥ time_horizon 且条件成立**，才可判 `confirmed`。先比较 today 与 time_horizon，再决定能否用 confirmed。
+
 **工作流程：**
-1. 用 WebSearch 搜索与 `falsification_condition` 和 `trigger_indicator` 相关的最新事件
-2. 判断：预测是否已被证实 / 已被证伪 / 尚未到期（仍在 time_horizon 内且无决定性证据）
-3. 如果已被证伪，记录具体的证伪事件和信源
-4. 如果尚未到期，评估当前证据对预测成立概率的影响方向
+1. 用 WebSearch 搜索与 `falsification_condition` 和 `trigger_indicator` 相关的**最新**事件（含"今天/过去 48 小时"）
+2. 先看 `time_horizon` 是否已过：未过 → 最多 `on_track`/`falsified`/`pending`，**禁用 confirmed**
+3. 已被证伪 → 记录具体证伪事件和信源
+4. 评估当前证据对成立概率的影响方向（updated_probability）
 
 **输出 schema：**
 ```json
 {
   "mode": "prediction_verification",
-  "original_prediction": {"prediction": "...", "confidence": 0.7},
-  "verification_result": "confirmed|falsified|pending",
+  "original_prediction": {"prediction": "...", "confidence": 0.7, "time_horizon": "YYYY-MM-DD"},
+  "time_horizon": "YYYY-MM-DD",
+  "verification_result": "falsified|on_track|pending|confirmed",
   "evidence": [{"title": "...", "url": "...", "excerpt": "...", "tier": 1, "date": "YYYY-MM-DD"}],
-  "falsification_event": "具体证伪事件描述（仅 verification_result=falsified 时填写）",
+  "falsification_event": "具体证伪事件描述（仅 falsified 时填写）",
   "updated_probability": "当前证据下的修正概率（0.0-1.0）",
   "probability_rationale": "概率调整理由",
   "confidence": "high|medium|low"
 }
 ```
+> 注：`calculate_prediction_accuracy` 会做防御性复核——窗口未到的 `confirmed` 会被自动降级为 `on_track`、不计入 Brier。但你仍应在源头遵守时序规则。

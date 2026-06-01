@@ -103,3 +103,40 @@ def test_same_type_bonus_is_additive_tiebreaker():
     scores = {'D1': 5, 'D2': 4, 'D3': 4, 'D4': 4, 'D5': 5, 'D6': 5, 'D7': 5}  # Switzerland
     results = find_analogies(scores, system_type='geopolitical', top_k=1)
     assert results[0]['similarity'] <= 1.0
+
+
+# ── P6a: date-aware prediction calibration (no early-confirmed) ──
+
+def _vr(result, horizon, conf):
+    return {'verification_result': result, 'time_horizon': horizon,
+            'original_prediction': {'confidence': conf, 'prediction': 'x'}}
+
+
+def test_early_confirmed_reclassified_not_scored():
+    from agent.tools.history_compare import calculate_prediction_accuracy
+    vr = [_vr('confirmed', '2026-09-30', 0.78), _vr('confirmed', '2026-10-31', 0.64),
+          _vr('confirmed', '2026-12-31', 0.66)]
+    r = calculate_prediction_accuracy(vr, as_of_date='2026-06-01')
+    assert r['confirmed_count'] == 0          # 未到期不算证实
+    assert r['on_track_count'] == 3
+    assert r['reclassified_early_confirmed'] == 3
+    assert r['brier_score'] is None           # 无 resolved → 不刷假 Brier
+
+
+def test_confirmed_after_horizon_is_scored():
+    from agent.tools.history_compare import calculate_prediction_accuracy
+    vr = [_vr('confirmed', '2026-09-30', 0.78), _vr('confirmed', '2026-10-31', 0.64),
+          _vr('confirmed', '2026-12-31', 0.66)]
+    r = calculate_prediction_accuracy(vr, as_of_date='2027-01-01')
+    assert r['confirmed_count'] == 3
+    assert r['brier_score'] is not None
+
+
+def test_early_falsified_counts_immediately():
+    from agent.tools.history_compare import calculate_prediction_accuracy
+    # 提前证伪合法：条件已破，任何时候都算 resolved
+    vr = [_vr('falsified', '2026-12-31', 0.8), _vr('falsified', '2026-12-31', 0.7),
+          _vr('falsified', '2026-12-31', 0.6)]
+    r = calculate_prediction_accuracy(vr, as_of_date='2026-06-01')
+    assert r['falsified_count'] == 3
+    assert r['brier_score'] is not None
