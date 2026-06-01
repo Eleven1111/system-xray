@@ -592,7 +592,7 @@ python3 -m agent.agent --system "SYSTEM_NAME" --type SYSTEM_TYPE --save-analysis
 本步骤必须生成**三份**输出并列存入 Obsidian，**缺一不算完成**：
 1. `研究素材.md`（Step 8a，原始信源逐条存档）— **不可跳过**
 2. `诊断报告.html`（Step 8b，含雷达图 + 逐条 URL 信源审计）
-3. `系统诊断.md`（Step 8c，Markdown 备份）
+3. `系统诊断.md`（Step 8c，《纽约客》式叙事特稿——给人读的可读长稿，非表格备份）
 
 **可追溯性硬约束（P1）**：HTML 报告的信源审计节**必须由 `--build-audit` 工具从真实返回信源机械生成**，逐条带 URL+日期，按 T 级分组——**禁止手写"信源类别"**（如只列"T2: 路透/FT/CNN"而无具体条目+链接）。这保证每个结论可点击核验。
 
@@ -675,13 +675,27 @@ python3 -m agent.agent --build-audit --input /tmp/sx_brief.json
 
 ---
 
-#### Step 8c — 同时保存 Markdown 备份到 Obsidian
+#### Step 8c — 保存《纽约客》式叙事特稿（Markdown）
 
-用 Write 工具把报告 Markdown 写到临时文件，再走 CLI：
+**这份 MD 不是 HTML 报告的"表格备份"，而是一篇独立的、给人读的深度叙事特稿（New Yorker / 三联·财经特稿 register）。** HTML 是带雷达图/callout 的结构化智库报告；这份 MD 是同一诊断的**可读叙事版**——目标是让读者"愿意一口气读完，读完又掌握全貌"。
+
+**写法（强制）：**
+1. **钩子开篇**：用一个场景、一句引语或一个反差开头（如某高管的一句话、一个数字、一桩事件），不要用"本报告分析……"这类开场。
+2. **叙事脊柱**：找到贯穿全篇的一条线索/张力（如"漏水的船"=追赶 vs 护城河），让七维诊断顺着故事自然展开，而不是逐条罗列 D1-D7。
+3. **人物与场景**：写出关键代理人（决策者、对手、关键事件）——有名字、有动作、有冲突。
+4. **分析融入叙事**：维度评分与病理判断**编织进行文**（"这恰是时间代谢健康的标志——"），不单独成表。证据行内引用。
+5. **诚实成为情节**：把 fact_check/信源核验的发现写成一个叙事节拍（"一次自我核查，拦下了一句话"），而非方法论脚注——这反而是最能赢得读者信任的段落。
+6. **小标题分节**：用有画面感/判断性的小标题（"那道别人没有的墙"），不用"七维诊断矩阵"这类骨架词。
+7. **kicker 收尾**：结在一句有回味的判断上。
+8. **末尾附「诊断速览」**：一个紧凑的七维评分表 + 演化情景 + 可证伪预测 + 方法/置信声明，供想要结构化全貌的读者查阅。正文叙事 + 末尾速览 = 兼顾"愿读"与"全貌"。
+
+> 禁止把这份 MD 写成 bullet/表格堆砌（那是早期的可读性硬伤）。表格只允许出现在末尾「诊断速览」里。
+
+用 Write 工具把特稿 Markdown 写到临时文件，再走 CLI：
 
 ```bash
 cd /Users/na/.claude/skills/system-xray
-# 先用 Write 工具把报告 Markdown 写到 /tmp/sx_report.md
+# 先用 Write 工具把叙事特稿 Markdown 写到 /tmp/sx_report.md
 python3 -m agent.agent --system "SYSTEM_NAME" --type SYSTEM_TYPE --save-md --input /tmp/sx_report.md
 ```
 
@@ -690,7 +704,7 @@ python3 -m agent.agent --system "SYSTEM_NAME" --type SYSTEM_TYPE --save-md --inp
 System Pathology/
   2026-05-18 中美关系 研究素材.md     ← 原始信源 + 矛盾信号（Step 8a）
   2026-05-18 中美关系 诊断报告.html   ← 智库风格可读报告（Step 8b）
-  2026-05-18 中美关系 系统诊断.md     ← Markdown 备份（Step 8c）
+  2026-05-18 中美关系 系统诊断.md     ← 《纽约客》式叙事特稿（Step 8c）
 ```
 
 ---

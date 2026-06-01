@@ -133,7 +133,7 @@ Orchestrator（你）
 |------|------|------|------|
 | `{date} {name} 研究素材.md` | MD | 原始信源 + 矛盾信号 + 覆盖缺口 | `save_research_materials()` |
 | `{date} {name} 诊断报告.html` | HTML | Brookings/CSIS 智库风格可读报告（含雷达图） | `save_html_report()` |
-| `{date} {name} 系统诊断.md` | MD | Markdown 报告备份 | `save_to_obsidian()` |
+| `{date} {name} 系统诊断.md` | MD | 《纽约客》式叙事特稿（给人读的可读长稿，正文叙事 + 末尾诊断速览，详见 system.md Step 8c） | `save_to_obsidian()` |
 
 HTML 报告使用 `build_radar_svg(scores)` 生成七维雷达图内联 SVG。Orchestrator 负责 MD→HTML 转换，详见 `agent/prompts/system.md` Step 8b。
 
