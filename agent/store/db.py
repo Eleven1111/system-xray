@@ -631,7 +631,9 @@ _HTML_TEMPLATE = dedent("""\
     margin: 24px 0;
   }}
   .radar-container svg {{
-    max-width: 400px;
+    width: 100%;
+    max-width: 520px;
+    height: auto;
   }}
 
   /* ── 折叠信源审计 ── */
@@ -909,13 +911,13 @@ def build_source_audit_html(sources: list[dict], verifications: list[dict] | Non
 
 
 _DIMENSION_LABELS = {
-    'D1': '边界拓扑',
-    'D2': '激励架构',
-    'D3': '信息神经',
-    'D4': '时间代谢',
-    'D5': '合法性叙事',
-    'D6': '耦合架构',
-    'D7': '权力拓扑',
+    'D1': '边界结构',
+    'D2': '激励机制',
+    'D3': '信息与反馈',
+    'D4': '演化能力',
+    'D5': '合法性与叙事',
+    'D6': '耦合与依赖',
+    'D7': '权力结构',
 }
 
 
@@ -936,10 +938,16 @@ def build_radar_svg(scores: dict[str, int | float], size: int = 380) -> str:
         r = r_max * level / 5
         return cx + r * math.cos(theta), cy + r * math.sin(theta)
 
+    # viewBox 留白：维度标签放在 polar(5.8) 处、向外延伸，长中文名（如"合法性与叙事 3/5"）
+    # 会超出 size×size 边界被裁。给左右各 110、上下各 28 的留白把文字包进画布，
+    # 再由 .radar-container svg 的 max-width 整体缩放，确保任何长度的标签都完整显示。
+    pad_x, pad_y = 110, 28
+    vb_w, vb_h = size + 2 * pad_x, size + 2 * pad_y
     lines: list[str] = []
     lines.append(
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" '
-        f'width="{size}" height="{size}">'
+        f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'viewBox="{-pad_x} {-pad_y} {vb_w} {vb_h}" '
+        f'width="{vb_w}" height="{vb_h}">'
     )
 
     for level in range(1, 6):

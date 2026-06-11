@@ -190,7 +190,7 @@ def test_cli_radar_via_stdin():
     r = _run_cli(['--radar'], stdin_text=json.dumps(scores))
     assert r.returncode == 0
     assert '<svg' in r.stdout
-    assert '权力拓扑 3/5' in r.stdout
+    assert '权力结构 3/5' in r.stdout
 
 
 def test_cli_save_html_handles_tricky_payload(tmp_path):
