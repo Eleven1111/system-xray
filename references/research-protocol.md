@@ -14,6 +14,7 @@ Determine system type to select the right search template:
 | **DAO / Web3** | On-chain governance, token holders, multisig | Protocol D |
 | **Platform Ecosystem** | Marketplace, two-sided network, API economy | Protocol E |
 | **Industry / Market** | Sector-level, not single org | Protocol F |
+| **Relational System** | The system is an interaction among actors, not an entity: conflict, rivalry, alliance, deterrence standoff | Protocol M |
 
 ---
 
@@ -196,6 +197,40 @@ Agent 2 — Disruption Signals:
 ```
 
 ---
+
+## Protocol M: Relational System (关系系统协议)
+
+> 分析对象是**互动格局本身**（冲突/对抗/联盟/竞合），不是任何单一实体。采集围绕互动机制组织。
+
+**Agent 1 — Escalation & De-escalation Dynamics (同批对照，强制)**
+```
+1. "[System] escalation OR strike OR retaliation {current_year}"
+2. "[System] ceasefire OR negotiation OR backchannel OR mediation {current_year}"
+3. "[System] red line OR warning OR ultimatum"
+4. "[System] escalation ladder OR deterrence analysis"
+```
+
+**Agent 2 — Structure & Entanglement**
+```
+1. "[System] military balance OR capabilities comparison"
+2. "[System] proxy OR militia OR allied forces"
+3. "[System] sanctions OR trade interdependence impact"
+4. "[System] alliance obligations OR security guarantee"
+```
+
+**Agent 3 — Perception & Third Parties**
+```
+1. "[System] miscalculation OR misperception OR intelligence assessment"
+2. "[System] China OR Russia OR Europe OR UN mediation role"
+3. "[System] domestic politics OR hardliners pressure"
+4. "[System] 'Crisis Group' OR Carnegie OR RAND analysis"
+```
+
+**关系系统采集特殊规则：**
+1. **每一方的本地语言一手信源都要采**——当事各方对同一事件的叙事差异是关系系统最核心的诊断信号（detect_languages 会同时触发多语言，如伊朗-以色列 → fa；沙特-伊朗 → ar+fa）
+2. **升级信号与缓和信号必须同批对照**——只看升级会高估失控风险，只看缓和会漏掉棘轮效应
+3. 评分语义：健康度 = 互动的**可管理性**（红线清晰度、信号保真度、降级渠道），不是友好度
+4. 各方官方表态按"该方立场的 T1"处理，但对**事实问题**（谁先打、伤亡数字）各方官方源都只算 T2——交叉验证靠第三方 T1/T2
 
 ---
 

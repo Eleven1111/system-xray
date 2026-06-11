@@ -17,6 +17,9 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agent.tools.query_generator import generate_queries, format_for_claude, SYSTEM_TYPES
+from agent.tools.causal_graph import analyze_graph
+from agent.tools.ach_score import score_hypotheses
+from agent.tools.history_compare import detect_danger_zones
 from agent.store.db import (
     list_analyses, load_latest, load_predictions,
     save_analysis, save_html_report, save_research_materials,
@@ -44,6 +47,7 @@ def cmd_list_types():
         'dao':               'DAO/Web3 组织',
         'market':            '行业/市场',
         'platform':          '平台生态',
+        'relational':        '关系系统（多行为体互动格局：冲突/对抗/联盟，如"伊朗-美国-以色列"）',
     }
     for t, desc in descriptions.items():
         print(f"  {t:<20} {desc}")
@@ -164,6 +168,30 @@ def cmd_verify_plan(args):
           '写回 brief 的 source_verification 字段，并置 process_metadata.source_verification_done=true')
 
 
+def cmd_causal(args):
+    """从交互边 JSON 计算反馈回路/杠杆点/处方交叉检查（Step 5.2/5.6 的确定性引擎）。"""
+    payload = json.loads(_read_payload(args.input))
+    result = analyze_graph(payload)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    if result.get('errors'):
+        sys.exit(1)
+
+
+def cmd_ach_score(args):
+    """从 ACH 证据矩阵 JSON 计算假说加权排序与状态（Step 4.5 的定量引擎）。"""
+    payload = json.loads(_read_payload(args.input))
+    result = score_hypotheses(payload.get('hypotheses', []), payload.get('evidence', []))
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    if result.get('errors'):
+        sys.exit(1)
+
+
+def cmd_danger_zones(args):
+    """从七维评分 JSON 自动比对危险区/生存区签名（机械化 scoring-calibration 交叉表）。"""
+    scores = json.loads(_read_payload(args.input))
+    print(json.dumps(detect_danger_zones(scores), ensure_ascii=False, indent=2))
+
+
 def cmd_save_materials(args):
     """从文件/stdin 读取 Research Brief JSON 并保存为 MD 素材。"""
     brief = json.loads(_read_payload(args.input))
@@ -242,6 +270,9 @@ def main():
     parser.add_argument('--save-md',        action='store_true', help='读取报告 Markdown 并保存为 Obsidian 备份')
     parser.add_argument('--validate',       action='store_true', help='仅校验 analysis JSON 结构，不落盘')
     parser.add_argument('--radar',          action='store_true', help='读取七维评分 JSON，输出雷达图 SVG')
+    parser.add_argument('--causal',         action='store_true', help='读取交互边 JSON({edges,scores?,trajectories?,prescriptions?})，输出回路/杠杆点/处方交叉检查')
+    parser.add_argument('--ach-score',      action='store_true', help='读取 ACH 矩阵 JSON({hypotheses,evidence})，输出假说加权排序与状态')
+    parser.add_argument('--danger-zones',   action='store_true', help='读取七维评分 JSON，输出危险区/生存区签名命中')
     parser.add_argument('--build-audit',    action='store_true', help='读取 Brief JSON(含 sources[])，输出逐条 URL 信源审计 HTML 片段')
     parser.add_argument('--verify-plan',     action='store_true', help='从 Brief JSON 选出最该 WebFetch 抽查的信源，输出核验清单')
     parser.add_argument('--triage-claims',   action='store_true', help='从 analysis JSON 分诊出最该独立 fact_check 的载荷性薄佐证断言')
@@ -261,6 +292,18 @@ def main():
 
     if args.radar:
         cmd_radar(args)
+        return
+
+    if args.causal:
+        cmd_causal(args)
+        return
+
+    if args.ach_score:
+        cmd_ach_score(args)
+        return
+
+    if args.danger_zones:
+        cmd_danger_zones(args)
         return
 
     if args.build_audit:

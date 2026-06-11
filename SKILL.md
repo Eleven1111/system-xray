@@ -16,6 +16,7 @@ This framework works on any structured system with agents, rules, and boundaries
 - **Markets & ecosystems** (industry verticals, platform ecosystems, supply chains)
 - **Internal subsystems** (a single department, a product team, a decision-making process)
 - **Geopolitical entities** (nation-states, trade blocs, international institutions)
+- **Relational systems** (系统由互动关系本身构成，而非任何单一实体：冲突格局如"伊朗-美国-以色列"、战略竞争如中美关系、联盟体系、威慑对峙、竞合生态 — see "Relational Systems: Seven-Dimension Reinterpretation" below)
 
 ## Reference Files
 
@@ -33,7 +34,9 @@ This skill has an `agent/` directory with full orchestrator-subagent infrastruct
 - `agent/prompts/researcher-sources.md` — 6 种本地语言信源分级表（按需粘贴该批次涉及的语言节）
 - `agent/prompts/researcher-modes.md` — 4 种 Round 2 模式：gap_filler / contradiction_resolution / data_anchor / prediction_verification（仅 Round 2 时按需粘贴对应节）
 - `agent/tools/query_generator.py` — 生成多视角查询集 + 并行批次分组（纯计算）
-- `agent/tools/history_compare.py` — 跨期维度评分对比 + 预测校准分数计算 + 历史类比匹配（纯计算）
+- `agent/tools/history_compare.py` — 跨期维度评分对比 + 预测校准分数计算 + 历史类比匹配 + 危险区/生存区签名检测（`detect_danger_zones`：机械化 scoring-calibration 交叉表，评分一出自动比对 Enron/Theranos 型灾难签名）（纯计算）
+- `agent/tools/causal_graph.py` — 跨维因果图引擎（纯计算）：反馈回路检测与恶性/良性分类、杠杆点排序（Meadows）、干预传播模拟、处方溢出交叉检查——Step 5.2/5.6 的"逻辑后果"不再靠手工记账
+- `agent/tools/ach_score.py` — ACH 定量评分（纯计算）：信源层级加权（T1 的 I ≫ T3 的 I）+ 鉴别力降权（全 C 证据无区分力）+ 假说状态机械判定（eliminated/stressed/active/untestable）+ 结构性 flags（全部存活=高不确定）
 - `agent/store/db.py` — 持久化（JSON + MD素材 + HTML智库报告 + 雷达图SVG + 预测加载）+ 落盘校验（`validate_analysis`：维度/预测/`dimension_evidence` 强制）+ 流程告警（`process_warnings`：Round2/ACH/信源核验跳过非阻塞提醒）+ 信源审计生成（`build_source_audit_html`：逐条 URL + 核验徽章）+ 信源核验选样（`select_verification_sample`：挑最该 WebFetch 抽查的高权重/定量信源）+ 综述类错误分诊（`triage_claims_for_factcheck`：挑载荷性∩薄佐证断言交独立 fact_check sub-agent 复核）
 - `agent/agent.py` — CLI 辅助工具（查询集预览、历史记录查看）
 
@@ -99,7 +102,9 @@ Orchestrator（你）
 - [ ] Research Brief 已呈现用户并确认
 - [ ] 每个维度评分有对应信源（不得使用训练知识作为唯一依据）
 
-可用系统类型：`geopolitical` / `government_agency` / `public_company` / `private_company` / `dao` / `market` / `platform`
+可用系统类型：`geopolitical` / `government_agency` / `public_company` / `private_company` / `dao` / `market` / `platform` / `relational`
+
+> **实体系统 vs 关系系统**：前七类的分析对象是一个有边界的实体；`relational` 的分析对象是**多行为体的互动格局本身**（冲突、对抗、联盟、竞合）。判别法：如果"系统"换掉任何一方就不复存在（伊朗-以色列冲突离开任何一方都不成立），它是关系系统；如果换掉对手系统仍在（ByteDance 换个竞争对手还是 ByteDance），它是实体系统。关系系统的七维含义见下方重诠释表。
 
 ---
 
@@ -120,6 +125,8 @@ Orchestrator（你）
 ## 输出模式
 
 报告采用 **Brookings/CSIS 智库长文风格**：叙事散文为主体，行内引用信源，评分嵌入段首。表格/callout 仅在结构化数据确有必要时使用（不是默认容器）。
+
+HTML 报告（8b）按**分层阅读**组织——5 分钟读者只看摘要 + 每章标题、20 分钟读者看摘要 + 每章首段 + 图表、深度读者读全文：**每个章节标题本身即一个判断句**（不写"市场分析"，写"该市场正在向高端化集中"），**每章首句即结论**（先描述现象给认同感入口、再立刻给判断）。摘要与标题结论前置，全文反顾问腔/AI腔（禁用"赋能/协同/价值创造"等空心大词）。完整规范见 `agent/prompts/system.md`「输出格式：分层阅读设计」节。
 
 **完整模式（默认）：** 上期预测复盘（仅有历史预测时）→ 执行摘要（散文）→ 系统制图 → 七维诊断（每维 2-4 段散文）→ 交叉维度 → 风险节点 → 演化情景 → 可证伪预测 → 监控仪表板 → 信源审计（折叠）
 
@@ -232,10 +239,11 @@ Present this cartography to the user as a structured overview before diving into
 
    **Key principle:** One strong I outweighs ten Cs. Most evidence is consistent with multiple hypotheses (shared predictions). What distinguishes hypotheses is inconsistent evidence.
 
-3. **Hypothesis ranking** — Each hypothesis receives a status:
+3. **Hypothesis ranking** — Computed by `agent/tools/ach_score.py` (via `python3 -m agent.agent --ach-score`), not by eyeball. The tool applies tier-weighted inconsistency (a T1 "I" carries 3x the elimination force of a T3 "I"), diagnosticity down-weighting (evidence rating all hypotheses identically has no discriminating power), and assigns each hypothesis a status:
    - **Active**: Cannot be eliminated by current evidence
-   - **Stressed**: 1-2 I marks, not decisively eliminated
-   - **Eliminated**: Contradicted by strong evidence (specify which)
+   - **Stressed**: Inconsistent evidence exists but below elimination threshold (e.g., I-marks only from T3 sources)
+   - **Eliminated**: Weighted inconsistency ≥ threshold (e.g., one fully-diagnostic T1 contradiction)
+   - **Untestable**: All evidence neutral — flagged as "untestable", never promoted to "supported"
 
 4. **Injection into diagnosis** — Surviving hypotheses are passed to Stage 2. Each dimension analysis must note how its findings appear under each surviving hypothesis. If a dimension score would differ significantly across hypotheses, report a score range rather than a single number.
 
@@ -475,9 +483,38 @@ Each dimension has a **health score** (1-5) and **trajectory** (improving / stab
 
 ---
 
+#### Relational Systems: Seven-Dimension Reinterpretation（关系系统的七维重诠释）
+
+当 system_type = `relational`（冲突格局、战略竞争、联盟体系、威慑对峙），分析对象是**互动关系本身**，七个维度的诊断问题须按下表重诠释。**健康度语义**：评分衡量的是这个互动系统的**可管理性与稳定性**，不是友好程度——一对管理良好的宿敌关系（红线清晰、信号通畅、有降级渠道）可以打 4 分；一段表面友好但规则崩解的关系可能只有 2 分。
+
+| 维度 | 实体系统问的是 | 关系系统问的是 |
+|------|--------------|--------------|
+| **D1 边界结构** | 这个实体的硬墙与软膜在哪？ | **红线与交战规则**：各方红线是否清晰、被理解、被尊重？"游戏规则"（如影子战争的默契、海空相遇准则）是在制度化还是在瓦解？红线模糊或单方试探蚕食 = 边界侵蚀 |
+| **D2 激励机制** | 奖励信号是否产生生存所需行为？ | **克制的收益结构**：各方从克制中获益还是从升级中获益？先发优势是否存在（最危险的激励倒置）？国内政治是否奖励对外强硬？威慑均衡是稳定的还是脆弱的？ |
+| **D3 信息与反馈** | 系统的大脑能否感知现实？ | **信号保真与误判风险**：各方能否准确读懂对方意图？危机沟通渠道（热线、后台渠道、斡旋者）是否存在且被使用？通过打击传递信号的误读率多高？1914 式"信号被读反"是最高危病理 |
+| **D4 演化能力** | 是否透支未来供养现在？ | **棘轮效应与可持续性**：每轮交手是否抬高暴力基线（升级棘轮）？关系是在制度化（军控、协议）、冻结（可控僵局）还是在燃烧双方的未来（消耗战）？有无"降级阶梯"？ |
+| **D5 合法性与叙事** | 系统讲给自己的故事是否还成立？ | **共存叙事**：各方是否承认对方的存在权（哪怕敌对）？相互妖魔化到何种程度（"大撒旦"式互相否定 = 1 分区）？国际社会是否接受这个互动格局的现状规则？ |
+| **D6 耦合与依赖** | 连接是过紧、过松还是连错了地方？ | **纠缠结构与传染通道**：代理人网络、联盟义务、经济相互依存把哪些局部火花变成系统性大火？1914 联盟体系（刚性纠缠）和经济相互依存（人质式威慑）是同一维度的两极 |
+| **D7 权力结构** | 谁能决定什么？权力如何流动？ | **极性与否决结构**：力量对比是对称（稳定威慑）还是转移中（修昔底德区间）？谁能否决升级（大国保护人、国内强硬派）？不对称是否把弱方推向代理人战争或核对冲？ |
+
+**关系系统的专属病理模式：**
+- *升级棘轮（Escalation ratchet）*：D4 病理——每轮交手后"正常"基线上移，影子战争变直接打击，打击变战争
+- *信号反转（Signal inversion）*：D3 病理——克制被读成软弱、威慑被读成挑衅（Able Archer 1983 / 1914 七月危机）
+- *刚性纠缠（Rigid entanglement）*：D6 病理——联盟义务/代理人链条让任何一方都无法单独踩刹车
+- *先发激励（First-mover incentive）*：D2 病理——军事技术或动员结构奖励先动手者，克制变成战略劣势
+- *共存叙事归零（Coexistence narrative collapse）*：D5 病理——任何一方不再讲"与对方共存"的故事，妥协在国内政治上不可能
+
+研究采集端：`relational` 类型的视角矩阵围绕互动机制组织（升级事件/缓和渠道/各方红线/威慑结构/第三方斡旋/代理人网络/信号误判），而非单一实体的内部健康；升级与缓和视角强制同批派发（同一 Researcher 必须同时看到两类信号）。校准锚点见 `scoring-calibration.md` 各维度的 "Relational System" 轨道；历史类比库含古巴导弹危机、1914 七月危机、美苏缓和、印巴对峙等关系系统案例。
+
+---
+
 ### Stage 3: Cross-Dimensional Interaction Analysis
 
 After scoring each dimension independently, discover how they interact through a structured scan — not by matching known patterns.
+
+#### Step 3-pre — Danger/Survival Zone Signature Check (automatic)
+
+Before the pair scan, run the seven scores through `detect_danger_zones()` (via `python3 -m agent.agent --danger-zones`). This mechanizes the Cross-Reference table at the end of `scoring-calibration.md`: a hit on a danger signature (e.g., D5≤2 + D2≤2 = the Enron/Theranos/FTX legitimacy-incentive collapse) must be named in the risk-node chapter and the executive summary; a survival-zone hit (e.g., D4≥4 + D6≥4 = anti-fragile core) feeds the evolution-scenario probabilities.
 
 #### Step 3a — Dimension Pair Scan
 
@@ -491,19 +528,21 @@ Classification:
 
 Record only Strong and Weak interactions (expect 5-12 meaningful pairs per analysis).
 
-#### Step 3b — Feedback Loop Identification
+#### Step 3b — Feedback Loop Identification (tool-computed)
 
-From interacting pairs, identify closed loops:
+Encode the Strong/Weak interactions from Step 3a as causal edges and feed them to `agent/tools/causal_graph.py` (via `python3 -m agent.agent --causal`). Edge semantics describe **health transmission**: `sign:"+"` = same-direction (a doom loop where both dimensions rot together is `+`/`+`), `sign:"-"` = antagonistic. The tool detects all closed loops and classifies them:
 
 | Type | Definition | Danger Level |
 |------|-----------|-------------|
-| Vicious Cycle | Di↓ → Dj↓ → ... → Di↓ | High: exponential deterioration |
-| Virtuous Cycle | Di↑ → Dj↑ → ... → Di↑ | Positive but may create fragile dependency |
-| Antagonism | Di↑ → Dj↓ | Medium: improving one dimension may cost another |
+| Vicious Cycle | Reinforcing loop + low scores or down-trajectory | High: exponential deterioration |
+| Virtuous Cycle | Reinforcing loop + high scores, no down-trajectory | Positive but may create fragile dependency |
+| Antagonism | Balancing loop (odd number of negative edges) | Medium: improving one dimension may cost another |
 
-#### Step 3c — Leverage Point Ranking
+The analyst judges which edges exist and through what mechanism; the tool computes the logical consequences (closure, polarity, classification). Disagreement with tool output means a missing or mis-signed edge — fix the declaration, don't override the computation.
 
-The dimension appearing in the most feedback loops = the system's leverage point (Meadows). Rank dimensions by feedback loop participation count. The top leverage point should be the primary target for interventions in Stage 5.
+#### Step 3c — Leverage Point Ranking (tool-computed)
+
+The same `--causal` call returns `leverage_ranking`: loop-participation count as primary key, strength-weighted degree as tiebreaker (Meadows). The top leverage point should be the primary target for interventions in Stage 5 — and Stage 5's prescription spillover/conflict cross-check reuses the same causal graph via `prescription_check` (intervention propagation simulation).
 
 #### Step 3d — Known Pattern Matching
 
@@ -526,16 +565,16 @@ The known pattern library is an aid for naming, not a constraint on discovery. A
 
 ### Stage 3.5: Historical Analogy Matching
 
-After scoring all seven dimensions, match the current system's score vector against 43 historical reference cases using cosine similarity. This provides structural analogies — systems that "looked like this" in the past — to contextualize the diagnosis.
+After scoring all seven dimensions, match the current system's score vector against 51 historical reference cases using a magnitude-aware distance metric. This provides structural analogies — systems that "looked like this" in the past — to contextualize the diagnosis.
 
 **Tool:** `agent/tools/history_compare.py` → `find_analogies(scores, system_type, top_k=3)`
 
 **How it works:**
-- Computes cosine similarity between the current 7-dimensional score vector and each historical case
-- Same system_type cases receive a 1.2x similarity boost (a failing company resembles other failing companies more than failing states)
+- Computes Euclidean-distance similarity between the current 7-dimensional score vector and each historical case (magnitude-aware: an all-low crisis vector can never match an all-high healthy system — a real flaw cosine similarity had)
+- Same system_type cases receive a small additive tiebreaker bonus (+0.08, clamped to 1.0): a failing company resembles other failing companies more than failing states, but a loose same-type match never beats a tight cross-type match
 - Returns top-k results with: similarity score, case name, outcome, key lesson, score vector
 
-**Historical case library:** `references/analogy-cases.json` — 43 cases across 6 system types (geopolitical, public_company, private_company, government_agency, market, platform)
+**Historical case library:** `references/analogy-cases.json` — 51 cases across 7 system types (geopolitical, public_company, private_company, government_agency, market, platform, relational). The relational track covers multi-actor interaction systems: July Crisis 1914, Cuban Missile Crisis, US-USSR détente, Egypt-Israel cold peace, India-Pakistan, US-China trade war, Iran-Israel shadow war, Russia-NATO 2021.
 
 **Interpretation rules:**
 - Analogies are heuristic, not predictive — "structurally similar to X" does not mean "will follow X's trajectory"
@@ -661,6 +700,8 @@ Ask the user which mode they want if not obvious from context.
    - 建议的深入调查方向
 ```
 
+> **注：上面模板里的章节名（"系统制图""七维诊断矩阵""战略演化沙盘"等）是结构槽位，不是最终标题。** 实际渲染时每个章节标题都必须改写成判断句（"市场分析"→"该市场正在向高端化集中"），首句即结论，全文反顾问腔/AI腔。完整规范见 `agent/prompts/system.md`「输出格式：分层阅读设计」节。
+
 ## Analysis Quality Standards
 
 - **Precision over comprehensiveness**: Better to deeply nail 3 insights than superficially cover 20
@@ -669,6 +710,7 @@ Ask the user which mode they want if not obvious from context.
 - **Non-obvious**: Skip anything the user already knows. Focus on what the surface hides.
 - **Actionable**: Every diagnosis should imply a possible intervention. If it doesn't, it's an observation, not a diagnosis.
 - **Intellectually honest**: State confidence levels. Flag where you're speculating. Distinguish between structural analysis (high confidence) and predictions (inherently uncertain).
+- **分层可读 + 反顾问腔**：报告按 5/20/完整三种读者分层（章节标题=判断句、每章首句=结论、图表自解释）；禁用空心大词（赋能/协同/价值创造），结论前置、少铺陈、MIT Technology Review 式克制。详见 `agent/prompts/system.md`「输出格式：分层阅读设计」节。
 
 ## Comparison Mode
 

@@ -686,5 +686,133 @@
     },
     "outcome": "Metaverse pivot stalled, AI pivot recovering stock price, Year of Efficiency cuts",
     "key_lesson": "D7=2 (Zuckerberg unilateral control) means company trajectory = founder judgment, no institutional check on bets"
+  },
+  {
+    "name": "July Crisis / European alliance system (1914)",
+    "system_type": "relational",
+    "time_snapshot": "1914",
+    "scores": {
+      "D1": 1,
+      "D2": 1,
+      "D3": 1,
+      "D4": 2,
+      "D5": 2,
+      "D6": 1,
+      "D7": 2
+    },
+    "outcome": "One assassination cascaded through rigid alliance commitments into continental war within five weeks",
+    "key_lesson": "Rigid entanglement (D6=1) + first-mover mobilization incentives (D2=1) + inverted signal reading (D3=1) is the canonical relational-system death signature"
+  },
+  {
+    "name": "Cuban Missile Crisis (1962)",
+    "system_type": "relational",
+    "time_snapshot": "1962",
+    "scores": {
+      "D1": 2,
+      "D2": 2,
+      "D3": 2,
+      "D4": 3,
+      "D5": 2,
+      "D6": 2,
+      "D7": 3
+    },
+    "outcome": "Stepped back from the brink; crisis converted into rule-building — hotline (1963), test ban, arms control era",
+    "key_lesson": "A near-catastrophe in a bipolar system with functioning escalation vetoes (D7=3) can be converted into boundary institutionalization (D1↑) — crisis as negentropy import"
+  },
+  {
+    "name": "US-USSR Détente (1972)",
+    "system_type": "relational",
+    "time_snapshot": "1969-1979",
+    "scores": {
+      "D1": 4,
+      "D2": 3,
+      "D3": 4,
+      "D4": 4,
+      "D5": 3,
+      "D6": 3,
+      "D7": 4
+    },
+    "outcome": "A decade of arms control and managed rivalry; unraveled after 1979 Afghanistan invasion",
+    "key_lesson": "A hostile relationship can be structurally healthy: explicit red lines (D1=4) + crisis channels (D3=4) made deep rivalry manageable — health ≠ friendship"
+  },
+  {
+    "name": "Egypt-Israel cold peace (1979-)",
+    "system_type": "relational",
+    "time_snapshot": "1979-present",
+    "scores": {
+      "D1": 4,
+      "D2": 3,
+      "D3": 3,
+      "D4": 3,
+      "D5": 2,
+      "D6": 3,
+      "D7": 3
+    },
+    "outcome": "Cold but durable peace for 45+ years, surviving wars, intifadas, and regime change on both sides",
+    "key_lesson": "A relational system can be stable with weak coexistence narrative (D5=2) if boundary rules (D1=4) and security/aid incentives (D2) hold — institutions outlast sentiment"
+  },
+  {
+    "name": "India-Pakistan (Balakot round, 2019)",
+    "system_type": "relational",
+    "time_snapshot": "2019",
+    "scores": {
+      "D1": 3,
+      "D2": 2,
+      "D3": 2,
+      "D4": 2,
+      "D5": 2,
+      "D6": 2,
+      "D7": 3
+    },
+    "outcome": "Escalated to first cross-border airstrikes since 1971, then stabilized within weeks; nuclear deterrence and third-party pressure held",
+    "key_lesson": "Even eroded norms can cap escalation when both sides need off-ramps and external powers (D7) press for them — but each round renormalizes a higher violence baseline (D4 ratchet)"
+  },
+  {
+    "name": "US-China trade war (2018-2020)",
+    "system_type": "relational",
+    "time_snapshot": "2018-2020",
+    "scores": {
+      "D1": 3,
+      "D2": 3,
+      "D3": 3,
+      "D4": 2,
+      "D5": 2,
+      "D6": 4,
+      "D7": 3
+    },
+    "outcome": "Tariff escalation froze into Phase One deal; strategic decoupling began and outlasted the truce",
+    "key_lesson": "Deep economic coupling (D6=4) buffered escalation into negotiation rather than rupture — but the conflict converted the coupling itself into the battlefield (de-risking)"
+  },
+  {
+    "name": "Iran-Israel shadow war (2024-2025)",
+    "system_type": "relational",
+    "time_snapshot": "2024-2025",
+    "scores": {
+      "D1": 2,
+      "D2": 2,
+      "D3": 2,
+      "D4": 2,
+      "D5": 1,
+      "D6": 1,
+      "D7": 2
+    },
+    "outcome": "Decades of shadow-war norms collapsed into direct missile exchanges (April/October 2024) and the June 2025 war",
+    "key_lesson": "Escalation ratchet (D4) + proxy coupling (D6=1) + zero coexistence narrative (D5=1) erode tacit red lines round by round until direct war becomes the new normal"
+  },
+  {
+    "name": "Russia-NATO/Ukraine (2021 eve of war)",
+    "system_type": "relational",
+    "time_snapshot": "2021",
+    "scores": {
+      "D1": 2,
+      "D2": 1,
+      "D3": 1,
+      "D4": 1,
+      "D5": 1,
+      "D6": 2,
+      "D7": 2
+    },
+    "outcome": "Full-scale invasion February 2022 — deterrence failed, warnings dismissed, off-ramps refused",
+    "key_lesson": "When one side concludes its relative future only worsens (D4=1), preventive-war logic overrides deterrence; signals of resolve were read as bluff (D3=1) by both sides"
   }
 ]

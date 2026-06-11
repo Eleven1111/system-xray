@@ -13,7 +13,7 @@
         "system_name": { "type": "string", "description": "Full name of the system analyzed" },
         "system_type": {
           "type": "string",
-          "enum": ["geopolitical", "government_agency", "public_company", "private_company", "market", "platform", "dao", "other"]
+          "enum": ["geopolitical", "government_agency", "public_company", "private_company", "market", "platform", "dao", "relational", "other"]
         },
         "analysis_date": { "type": "string", "format": "date" },
         "presenting_symptom": { "type": "string", "description": "Why was this analysis triggered?" },
@@ -353,7 +353,7 @@
 
     "historical_analogies": {
       "type": "array",
-      "description": "Top-3 structurally similar historical cases by 7-dim cosine similarity",
+      "description": "Top-3 structurally similar historical cases by magnitude-aware 7-dim distance similarity",
       "items": {
         "type": "object",
         "required": ["name", "similarity", "outcome", "key_lesson"],

@@ -67,6 +67,18 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | Facebook (Cambridge Analytica era) | Data boundaries violated, third-party access uncontrolled |
 | **1** | Early ad-tech (pre-GDPR) | No meaningful boundaries, user data extracted without consent |
 
+### Relational System (红线与交战规则)
+
+> Health = manageability of the interaction, not friendliness. A well-managed rivalry scores higher than a collapsing friendship.
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | US-Canada (ongoing) | Disputes fully institutionalized — boundary disagreements go to arbitration, not escalation |
+| **4** | US-USSR (post-1963) | Hotline, arms-control treaties, respected spheres of influence; red lines explicit and mutually understood |
+| **3** | India-Pakistan (LoC regime) | Rules of the game exist (ceasefire lines, DGMO channel) but periodically violated and renegotiated by fire |
+| **2** | Iran-Israel shadow war (2023-2025) | Tacit norms ("no direct strikes on homeland") eroding round by round; red lines probed and crossed |
+| **1** | Russia-Ukraine (2022) | All rules of the game collapsed into open interstate war; no mutually recognized boundaries remain |
+
 ---
 
 ## Dimension 2: Incentive Architecture
@@ -130,6 +142,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **3** | Uber/Lyft | Driver incentive misalignment, surge pricing tension |
 | **2** | Amazon Marketplace | Platform competes with sellers, perverse data advantage |
 | **1** | Facebook (engagement era) | Algorithm rewarded outrage/misinformation, anti-social incentives |
+
+### Relational System (克制的收益结构)
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | France-Germany (post-1957) | Positive-sum integration locked in by institutions; defection from cooperation is structurally unprofitable |
+| **4** | US-China trade (pre-2018) | Deep interdependence rewards restraint on both sides; escalation costly to both, visibly so |
+| **3** | Saudi-Iran (2023 Beijing détente) | Rivalry costly to both, periodic hedging pays; restraint incentives real but reversible |
+| **2** | Israel-Hezbollah deterrence | Escalation pays domestic/factional dividends on both sides even as it courts catastrophe |
+| **1** | Europe, July 1914 | Mobilization races created first-mover advantage — the incentive structure itself rewarded striking first |
 
 ---
 
@@ -195,6 +217,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | TikTok | Algorithm creates filter bubbles, environment manipulated |
 | **1** | Facebook (2016 election) | Algorithmic amplification of misinformation, feedback broken |
 
+### Relational System (信号保真与误判风险)
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | US-UK (ongoing) | Full transparency, integrated intelligence sharing; misreading intent essentially impossible |
+| **4** | US-USSR (post-hotline) | Dedicated crisis channels existed and were used; signals deliberate and mostly read as intended |
+| **3** | US-China (2020s) | Military hotlines exist but go unanswered in crises; intent read through think-tank tea leaves |
+| **2** | Iran-Israel (2024-2025) | Signaling conducted *through strikes*; each side decodes the other's calibrated attacks with high misread risk |
+| **1** | Able Archer 1983 / July 1914 | Catastrophic misperception: defensive exercises read as attack preparation, restraint read as weakness |
+
 ---
 
 ## Dimension 4: Temporal Metabolism
@@ -258,6 +290,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **3** | Netflix (2022-2023) | Pivoting from growth to profitability mid-stream, temporal reorientation |
 | **2** | Twitter/X (post-acquisition) | Cost-cutting consuming trust capital for short-term savings |
 | **1** | MySpace (2009) | Abandoned by users, zero renewal, total replacement inevitable |
+
+### Relational System (棘轮效应与可持续性)
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | Franco-German reconciliation | Former enemies invested in joint future institutions; the relationship compounds value over time |
+| **4** | US-USSR détente (1972) | Arms control bought decades; escalation ladder had institutionalized descending rungs |
+| **3** | India-Pakistan (frozen) | Neither escalating nor resolving; conflict frozen at sustainable cost, no ratchet but no exit |
+| **2** | Iran-Israel (2024-2025) | Escalation ratchet operating: each round raises the baseline of "normal" violence; off-ramps narrowing |
+| **1** | Russia-Ukraine attrition (2023+) | Both sides burning demographic and economic futures; war of attrition as mutual temporal cannibalism |
 
 ---
 
@@ -323,6 +365,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | Twitter/X | Narrative crisis, advertiser/user exodus, identity fragmented |
 | **1** | Parler/Truth Social | Niche legitimacy only, mainstream rejection |
 
+### Relational System (共存叙事)
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | NATO internal (core members) | Shared narrative framework; disagreements framed inside a common story |
+| **4** | US-China "managed competition" framing | Both sides maintain a coexistence story ("competition not conflict") — fragile but operative |
+| **3** | Egypt-Israel cold peace | Coexistence accepted at state level, rejected at street level; narrative cold but stable |
+| **2** | Iran-US mutual delegitimization | "Great Satan" / "axis of evil" — neither tells a story in which the other legitimately exists; diplomacy episodic |
+| **1** | Israel-Hamas | Mutual existential negation; no actor can sell coexistence domestically — compromise is narrative suicide |
+
 ---
 
 ## Dimension 6: Coupling Architecture
@@ -387,6 +439,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **2** | AWS for startups | Platform dependency = existential coupling for small companies |
 | **1** | WeChat for Chinese businesses | Total dependency, no alternative, cascade risk |
 
+### Relational System (纠缠结构与传染通道)
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | US-Canada | Deep but symmetric interdependence; shocks absorbed, never amplified |
+| **4** | US-China economic interdependence | Mutual-hostage coupling deters rupture — but the hostage structure itself is being deliberately unwound |
+| **3** | Saudi-Iran proxy map (Yemen/Lebanon) | Proxy entanglement transmits shocks across theaters, but principals retain partial firewall |
+| **2** | Iran-Israel-US triangle (2024-2025) | Proxy network (Hezbollah/Houthis/militias) means any local spark can cascade to principal-vs-principal war |
+| **1** | European alliance system (1914) | Rigid entanglement turned one assassination into continental war within five weeks — no actor could decouple |
+
 ---
 
 ## Dimension 7: Power Topology
@@ -450,6 +512,16 @@ Each score level is anchored to observable, verifiable characteristics.
 | **3** | Apple | Tim Cook holds power with board checks, succession planned |
 | **2** | Meta | Zuckerberg dual-class control, board cannot override |
 | **1** | Twitter/X (post-acquisition) | Single owner, absolute power, no institutional oversight |
+
+### Relational System (极性与否决结构)
+
+| Score | Anchor Case | Observable Characteristics |
+|-------|------------|---------------------------|
+| **5** | US-UK | Asymmetric power but fully institutionalized; coercion unthinkable, escalation veto irrelevant |
+| **4** | Cold War bipolarity (1963-1989) | Symmetric deterrence stable; both superpowers could and did veto their clients' escalations |
+| **3** | US-China (2020s) | Power-transition zone — Thucydides dynamics; escalation vetoes exist but weakening as parity approaches |
+| **2** | Iran-Israel-US asymmetry | Asymmetry pushes the weaker side toward proxies and nuclear hedging; no actor fully controls escalation |
+| **1** | Russia-Ukraine (2021 eve) | Overwhelming local asymmetry + no credible external veto = invasion temptation realized |
 
 ---
 

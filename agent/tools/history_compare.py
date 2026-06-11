@@ -30,13 +30,13 @@ _CASES_PATH = Path(__file__).resolve().parent.parent.parent / 'references' / 'an
 _CASES_CACHE: list[dict] | None = None
 
 DIMENSION_LABELS = {
-    'D1': '边界拓扑',
-    'D2': '激励架构',
-    'D3': '信息神经',
-    'D4': '时间代谢',
-    'D5': '合法性叙事',
-    'D6': '耦合架构',
-    'D7': '权力拓扑',
+    'D1': '边界结构',
+    'D2': '激励机制',
+    'D3': '信息与反馈',
+    'D4': '演化能力',
+    'D5': '合法性与叙事',
+    'D6': '耦合与依赖',
+    'D7': '权力结构',
 }
 
 
@@ -233,6 +233,71 @@ def calculate_prediction_accuracy(verification_results: list[dict], as_of_date: 
         'reclassified_early_confirmed': reclassified,
         'summary': summary,
     }
+
+
+# ── 危险区 / 生存区签名（机械化 references/scoring-calibration.md 的 Cross-Reference 表）──
+# 这张表是项目最有预测力的资产之一，此前只存在于文档里靠 Orchestrator 记得去查。
+# 评分一出即自动比对，命中即在报告中点名。
+
+_DANGER_ZONES = [
+    ('legitimacy_incentive_collapse', '合法性-激励双崩塌', {'D5': 2, 'D2': 2},
+     'Enron / Theranos / FTX 型签名：叙事失真掩护激励作弊，互为燃料'),
+    ('information_boundary_dysfunction', '信息-边界双失灵', {'D3': 2, 'D1': 2},
+     '苏联企业 / Wirecard 型签名：边界欺诈在信息失真下长期不被发现'),
+    ('temporal_coupling_catastrophe', '透支-紧耦合灾难', {'D4': 2, 'D6': 2},
+     'Toys "R" Us / 重 LBO 型签名：未来被抵押 + 无缓冲，一震即溃'),
+    ('narrative_feedback_death_spiral', '叙事-反馈死亡螺旋', {'D5': 2, 'D3': 2},
+     'WeWork / 独角兽爆雷型签名：故事替代了信号，反馈环失效'),
+    ('power_information_doom_loop', '权力-信息恶性循环', {'D7': 2, 'D3': 2},
+     'Theranos / 朝鲜 / 晚期 GE 型签名：权力集中过滤信息，决策脱实'),
+    ('succession_crisis_cascade', '继承危机级联', {'D7': 2, 'D4': 2},
+     '无继承计划家族企业 / 后创始人时代型签名：权力不确定缩短时间视野'),
+]
+
+_SURVIVAL_ZONES = [
+    ('antifragile_core', '反脆弱内核', {'D4': 4, 'D6': 4},
+     '演化能力强 + 耦合得当：能从冲击中受益而非仅存活'),
+    ('trust_information_flywheel', '信任-信息飞轮', {'D5': 4, 'D3': 4},
+     '叙事可信 + 信号保真：坏消息能上行，承诺能兑现'),
+    ('incentive_boundary_alignment', '激励-边界对齐', {'D2': 4, 'D1': 4},
+     '奖励与生存需要一致 + 边界清晰：作弊无利可图'),
+    ('power_accountability_balance', '权责对称', {'D7': 4, 'D2': 4},
+     '权力有制衡 + 激励相容：决策者承担其决策的后果'),
+]
+
+
+def detect_danger_zones(scores: dict) -> dict:
+    """
+    将七维评分自动比对危险区/生存区签名（高置信灾难前兆 / 抗冲击结构）。
+
+    危险区命中条件：签名内全部维度评分 ≤ 阈值（如 D5≤2 且 D2≤2）。
+    生存区命中条件：签名内全部维度评分 ≥ 阈值。
+    返回 {danger_zones: [...], survival_zones: [...], summary}。
+    缺失维度不视为命中（保守：不对没有评分的维度下判断）。
+    """
+    dangers, survivals = [], []
+    for key, label, sig, note in _DANGER_ZONES:
+        if all(d in scores and scores[d] <= v for d, v in sig.items()):
+            dangers.append({
+                'key': key, 'label': label, 'note': note,
+                'signature': {d: f'≤{v}' for d, v in sig.items()},
+                'actual': {d: scores[d] for d in sig},
+            })
+    for key, label, sig, note in _SURVIVAL_ZONES:
+        if all(d in scores and scores[d] >= v for d, v in sig.items()):
+            survivals.append({
+                'key': key, 'label': label, 'note': note,
+                'signature': {d: f'≥{v}' for d, v in sig.items()},
+                'actual': {d: scores[d] for d in sig},
+            })
+
+    if dangers:
+        summary = f'🛑 命中 {len(dangers)} 个高置信危险区签名：' + '；'.join(d['label'] for d in dangers)
+    elif survivals:
+        summary = f'✅ 命中 {len(survivals)} 个生存区签名：' + '；'.join(s['label'] for s in survivals)
+    else:
+        summary = '未命中已知危险区/生存区签名'
+    return {'danger_zones': dangers, 'survival_zones': survivals, 'summary': summary}
 
 
 def _load_cases() -> list[dict]:

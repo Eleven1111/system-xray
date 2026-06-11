@@ -9,13 +9,13 @@ sys.path.insert(0, str(ROOT))
 def test_dimension_labels_has_d7_in_db():
     from agent.store.db import _DIMENSION_LABELS
     assert 'D7' in _DIMENSION_LABELS
-    assert _DIMENSION_LABELS['D7'] == '权力拓扑'
+    assert _DIMENSION_LABELS['D7'] == '权力结构'
 
 
 def test_dimension_labels_has_d7_in_compare():
     from agent.tools.history_compare import DIMENSION_LABELS
     assert 'D7' in DIMENSION_LABELS
-    assert DIMENSION_LABELS['D7'] == '权力拓扑'
+    assert DIMENSION_LABELS['D7'] == '权力结构'
 
 
 def test_radar_svg_seven_dimensions():
@@ -23,8 +23,8 @@ def test_radar_svg_seven_dimensions():
     scores = {'D1': 3, 'D2': 4, 'D3': 2, 'D4': 5, 'D5': 3, 'D6': 4, 'D7': 3}
     svg = build_radar_svg(scores)
     assert '<svg' in svg
-    assert '权力拓扑' in svg
-    assert 'D7' not in svg or '权力拓扑 3/5' in svg
+    assert '权力结构' in svg
+    assert 'D7' not in svg or '权力结构 3/5' in svg
 
 
 def test_radar_svg_six_dimensions_still_works():
@@ -32,7 +32,7 @@ def test_radar_svg_six_dimensions_still_works():
     scores = {'D1': 3, 'D2': 4, 'D3': 2, 'D4': 5, 'D5': 3, 'D6': 4}
     svg = build_radar_svg(scores)
     assert '<svg' in svg
-    assert '权力拓扑' not in svg
+    assert '权力结构' not in svg
 
 
 def test_radar_svg_polygon_count():
@@ -140,3 +140,120 @@ def test_early_falsified_counts_immediately():
     r = calculate_prediction_accuracy(vr, as_of_date='2026-06-01')
     assert r['falsified_count'] == 3
     assert r['brier_score'] is not None
+
+
+# ── detect_danger_zones：危险区/生存区签名机械化 ──
+
+def test_danger_zone_enron_signature():
+    # D5≤2 + D2≤2 = 合法性-激励双崩塌（Enron/Theranos/FTX 签名）
+    from agent.tools.history_compare import detect_danger_zones
+    r = detect_danger_zones({'D1': 3, 'D2': 2, 'D3': 3, 'D4': 3, 'D5': 1, 'D6': 3, 'D7': 3})
+    keys = {d['key'] for d in r['danger_zones']}
+    assert 'legitimacy_incentive_collapse' in keys
+    assert '🛑' in r['summary']
+
+
+def test_danger_zone_multiple_hits():
+    # 全面崩溃向量应命中多个签名
+    from agent.tools.history_compare import detect_danger_zones
+    r = detect_danger_zones({'D1': 1, 'D2': 1, 'D3': 1, 'D4': 1, 'D5': 1, 'D6': 1, 'D7': 1})
+    assert len(r['danger_zones']) == 6
+
+
+def test_survival_zone_healthy_signature():
+    from agent.tools.history_compare import detect_danger_zones
+    r = detect_danger_zones({'D1': 4, 'D2': 4, 'D3': 4, 'D4': 4, 'D5': 4, 'D6': 4, 'D7': 4})
+    assert not r['danger_zones']
+    assert len(r['survival_zones']) == 4
+    assert '✅' in r['summary']
+
+
+def test_no_zone_hit_in_middle_range():
+    from agent.tools.history_compare import detect_danger_zones
+    r = detect_danger_zones({'D1': 3, 'D2': 3, 'D3': 3, 'D4': 3, 'D5': 3, 'D6': 3, 'D7': 3})
+    assert not r['danger_zones'] and not r['survival_zones']
+
+
+def test_missing_dimension_not_hit():
+    # 缺维不下判断（保守）：只有 D5 低、D2 缺失 → 不命中双崩塌
+    from agent.tools.history_compare import detect_danger_zones
+    r = detect_danger_zones({'D5': 1})
+    assert not r['danger_zones']
+
+
+# ── relational 系统类型 ──
+
+def test_relational_in_system_types():
+    from agent.tools.query_generator import SYSTEM_TYPES
+    assert 'relational' in SYSTEM_TYPES
+
+
+def test_relational_queries_generated():
+    from agent.tools.query_generator import generate_queries
+    r = generate_queries('Iran-US-Israel conflict', 'relational', date_str='20260611')
+    keys = {p['perspective'] for p in r['perspectives']}
+    # 关系系统核心视角：升级/缓和/红线/威慑/第三方
+    assert {'escalation_events', 'deescalation_diplomacy', 'parties_official',
+            'military_balance', 'third_party_mediators'} <= keys
+    # 'iran' 关键词应触发波斯语本地视角（复用 geopolitical 的语言节）
+    assert 'fa' in r['detected_languages']
+    assert any(p['perspective'].startswith('fa_') for p in r['perspectives'])
+
+
+def test_relational_escalation_deescalation_batched_together():
+    # 升级与缓和是同一互动的两面，必须同批派发给同一 Researcher
+    from agent.tools.query_generator import generate_queries, group_into_batches
+    r = generate_queries('India Pakistan standoff', 'relational', date_str='20260611')
+    batches = group_into_batches(r)
+    for b in batches:
+        keys = {p['perspective'] for p in b['perspectives']}
+        if 'escalation_events' in keys:
+            assert 'deescalation_diplomacy' in keys
+            break
+    else:
+        raise AssertionError('escalation_events 未出现在任何批次')
+
+
+def test_relational_chinese_perspectives_available():
+    from agent.tools.query_generator import generate_queries
+    r = generate_queries('中美战略竞争', 'relational', date_str='20260611')
+    assert 'zh' in r['detected_languages']
+    assert any(p['perspective'].startswith('zh_') and p['priority'] == 1
+               for p in r['perspectives'])
+
+
+def test_analogy_library_has_relational_cases():
+    from agent.tools.history_compare import _load_cases
+    cases = _load_cases()
+    rel = [c for c in cases if c['system_type'] == 'relational']
+    assert len(rel) >= 8
+    assert all(set(c['scores']) == {'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7'} for c in rel)
+
+
+def test_relational_prewar_vector_matches_collapse_cases():
+    # 1914 式向量（刚性纠缠+先发激励+信号反转）的同类型 top 类比应是关系系统崩溃案例
+    from agent.tools.history_compare import find_analogies
+    scores = {'D1': 1, 'D2': 1, 'D3': 1, 'D4': 2, 'D5': 2, 'D6': 1, 'D7': 2}
+    results = find_analogies(scores, system_type='relational', top_k=3)
+    names = {r['name'] for r in results}
+    assert names & {'July Crisis / European alliance system (1914)',
+                    'Russia-NATO/Ukraine (2021 eve of war)'}
+
+
+def test_relational_managed_rivalry_matches_detente_not_war():
+    # 管理良好的对抗（红线清晰/渠道通畅）应匹配缓和期，而非 1914
+    from agent.tools.history_compare import find_analogies
+    scores = {'D1': 4, 'D2': 3, 'D3': 4, 'D4': 4, 'D5': 3, 'D6': 3, 'D7': 4}
+    results = find_analogies(scores, system_type='relational', top_k=3)
+    names = {r['name'] for r in results}
+    assert 'US-USSR Détente (1972)' in names
+    assert 'July Crisis / European alliance system (1914)' not in names
+
+
+def test_chinese_exonym_triggers_local_language():
+    # 用户以中文命名关系系统时，当事方本地语言必须被检测到
+    from agent.tools.query_generator import detect_languages
+    assert detect_languages('伊朗-美国-以色列冲突') >= {'zh', 'fa'}
+    assert detect_languages('沙特-伊朗代理战争') >= {'zh', 'ar', 'fa'}
+    assert detect_languages('俄乌战争') >= {'zh', 'ru'}
+    assert detect_languages('朝鲜半岛局势') >= {'zh', 'ko'}

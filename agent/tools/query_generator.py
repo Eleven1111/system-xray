@@ -27,6 +27,7 @@ SYSTEM_TYPES = [
     'dao',                # DAO/Web3 组织
     'market',             # 行业/市场
     'platform',           # 平台生态
+    'relational',         # 关系系统：多行为体互动格局（冲突/对抗/联盟/竞合），如"伊朗-美国-以色列冲突"
 ]
 
 # 每个系统类型的视角矩阵
@@ -103,6 +104,21 @@ PERSPECTIVE_MATRIX = {
         ('network',             3, 3, '{name} network effects OR user growth OR churn {prev_year} OR {year}'),
         ('platform_power',      2, 1, '{name} platform governance OR unilateral policy change OR creator power OR union {prev_year} OR {year}'),
     ],
+    # 关系系统：分析对象不是单一实体，而是多行为体的互动格局本身。
+    # 视角围绕互动机制组织：升级/缓和、各方红线、威慑结构、第三方、代理人网络、信号与误判。
+    'relational': [
+        ('escalation_events',      2, 1, '{name} escalation OR strike OR retaliation OR clash {prev_year} OR {year}'),
+        ('deescalation_diplomacy', 2, 1, '{name} ceasefire OR negotiation OR talks OR mediation OR backchannel {prev_year} OR {year}'),
+        ('parties_official',       1, 1, '{name} official statement OR red line OR warning OR ultimatum {prev_year} OR {year}'),
+        ('military_balance',       2, 1, '{name} military balance OR deterrence OR escalation ladder {prev_year} OR {year}'),
+        ('third_party_mediators',  2, 1, '{name} mediation OR China OR Russia OR Europe OR UN role {prev_year} OR {year}'),
+        ('proxy_linkages',         2, 2, '{name} proxy OR militia OR allied forces OR axis {prev_year} OR {year}'),
+        ('signaling_perception',   2, 2, '{name} signal OR miscalculation OR intelligence assessment OR misperception {prev_year} OR {year}'),
+        ('economic_linkage',       2, 2, '{name} sanctions OR trade impact OR oil price {prev_year} OR {year}'),
+        ('domestic_politics',      3, 2, '{name} domestic politics OR hardliners OR public opinion pressure {prev_year} OR {year}'),
+        ('think_tank',             2, 2, '{name} "Crisis Group" OR Carnegie OR RAND OR "Chatham House" analysis {prev_year} OR {year}'),
+        ('international_law',      3, 3, '{name} UN resolution OR Security Council OR international law {prev_year} OR {year}'),
+    ],
 }
 
 # ── 中文补充视角矩阵 ──
@@ -143,6 +159,10 @@ CHINESE_PERSPECTIVES = {
     ],
     'dao': [],
 }
+
+# 关系系统的中文采集视角与地缘实体一致（官方/优质媒体/智库视角同样适用于冲突格局，
+# 且中国常是关系系统中的当事方或斡旋方）。
+CHINESE_PERSPECTIVES['relational'] = CHINESE_PERSPECTIVES['geopolitical']
 
 # ── 其他语言补充视角矩阵（骨架 v1：仅 geopolitical 类型） ──
 # 非 geopolitical 类型暂不追加本地语言视角，英文查询已足够。
@@ -187,6 +207,12 @@ LOCAL_PERSPECTIVES: dict[str, dict[str, list]] = {
     },
 }
 
+# 关系系统（冲突/对抗格局）的本地语言视角复用 geopolitical 的官方/优质/智库视角——
+# 各方当事国的本地一手信源正是关系系统最关键的"立场对照"素材。
+for _lang_cfg in LOCAL_PERSPECTIVES.values():
+    if 'geopolitical' in _lang_cfg:
+        _lang_cfg.setdefault('relational', _lang_cfg['geopolitical'])
+
 # ── 多语言注册表（骨架 v1） ──
 # 每种语言一条配置：Unicode 检测 + 话题关键词 + T1/T2/T3 信源 + P0/P1 查询模板。
 # 扩展新语言：添加一条 LANGUAGE_REGISTRY 条目 + LOCAL_PERSPECTIVES 条目即可。
@@ -216,6 +242,8 @@ LANGUAGE_REGISTRY: dict[str, dict] = {
     'ar': {
         'label': '阿拉伯语',
         'unicode_pattern': re.compile(r'[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]'),
+        # 中文外名：用户以中文命名系统时（"沙特-伊朗代理战争"）仍能触发本地语言采集
+        'exonym_pattern': re.compile(r'沙特|阿联酋|卡塔尔|科威特|阿曼|巴林|也门|伊拉克|叙利亚|约旦|黎巴嫩|埃及|利比亚|海湾国家|阿盟|胡塞|真主党|哈马斯|中东'),
         'topic_keywords': re.compile(
             r'\b(saudi|arabia|uae|emirates|qatar|bahrain|kuwait|oman|yemen|iraq|syria|'
             r'jordan|lebanon|egypt|libya|tunisia|algeria|morocco|sudan|'
@@ -239,6 +267,7 @@ LANGUAGE_REGISTRY: dict[str, dict] = {
     'fa': {
         'label': '波斯语',
         'unicode_pattern': re.compile(r'[؀-ۿ](?:.*[پچژگی])'),
+        'exonym_pattern': re.compile(r'伊朗|德黑兰|哈梅内伊|革命卫队|伊核'),
         'topic_keywords': re.compile(
             r'\b(iran|iranian|tehran|persian|persia|'
             r'khamenei|raisi|rouhani|irgc|quds\s*force|'
@@ -261,6 +290,7 @@ LANGUAGE_REGISTRY: dict[str, dict] = {
     'ru': {
         'label': '俄语',
         'unicode_pattern': re.compile(r'[Ѐ-ӿ]'),
+        'exonym_pattern': re.compile(r'俄罗斯|俄乌|莫斯科|克里姆林|普京|顿巴斯|克里米亚'),
         'topic_keywords': re.compile(
             r'\b(russia|russian|moscow|kremlin|putin|'
             r'ukraine|donbas|crimea|nato\s*russia|'
@@ -283,6 +313,7 @@ LANGUAGE_REGISTRY: dict[str, dict] = {
     'ja': {
         'label': '日语',
         'unicode_pattern': re.compile(r'[぀-ゟ゠-ヿ]'),
+        'exonym_pattern': re.compile(r'日本|东京|日元|日银|日美|中日|日韩'),
         'topic_keywords': re.compile(
             r'\b(japan|japanese|tokyo|osaka|'
             r'kishida|fumio|ldp|'
@@ -306,6 +337,7 @@ LANGUAGE_REGISTRY: dict[str, dict] = {
     'ko': {
         'label': '韩语',
         'unicode_pattern': re.compile(r'[가-힯ᄀ-ᇿ]'),
+        'exonym_pattern': re.compile(r'韩国|朝鲜|首尔|平壤|三八线|半岛|韩美|中韩|日韩'),
         'topic_keywords': re.compile(
             r'\b(korea|korean|seoul|pyongyang|'
             r'north\s*korea|south\s*korea|dprk|rok|'
@@ -345,6 +377,10 @@ def detect_languages(system_name: str, force_langs: set[str] | None = None) -> s
         if config['unicode_pattern'].search(system_name):
             matched.add(lang_code)
         elif config['topic_keywords'].search(system_name):
+            matched.add(lang_code)
+        elif 'exonym_pattern' in config and config['exonym_pattern'].search(system_name):
+            # 中文外名触发：用户以中文命名系统（"伊朗-美国-以色列冲突"）时，
+            # 当事方本地语言信源同样必须采集，不能因输入语言是中文而漏掉
             matched.add(lang_code)
     return matched
 
@@ -402,6 +438,16 @@ PERSPECTIVE_LABELS = {
     'supply_demand':      '供给/需求侧',
     'trust':              '信任/质量',
     'network':            '网络效应',
+    'escalation_events':      '升级事件',
+    'deescalation_diplomacy': '缓和/外交渠道',
+    'parties_official':       '各方官方立场/红线',
+    'military_balance':       '军力对比/威慑结构',
+    'third_party_mediators':  '第三方/斡旋者',
+    'proxy_linkages':         '代理人网络',
+    'signaling_perception':   '信号与误判',
+    'economic_linkage':       '经济联结/制裁',
+    'domestic_politics':      '各方国内政治',
+    'international_law':      '国际法/联合国',
     'recent_breaking':    '近期突发/快讯',
     'recent_developments':'近期重大进展',
     'recent_analysis':    '近期深度分析',
@@ -423,6 +469,10 @@ PERSPECTIVE_LABELS = {
     'zh_policy_impact':   '中文政策影响',
     'zh_platform_media':  '中文平台媒体',
     'zh_user_signal':     '中文用户信号',
+    'zh_power_dynamics':  '中文权力动态',
+    'zh_agency_power':    '中文机构人事',
+    'zh_corp_governance': '中文公司治理',
+    'zh_founder_power':   '中文创始人控制权',
     # 阿拉伯语
     'ar_recent_breaking':    '阿拉伯语近期快讯',
     'ar_recent_developments':'阿拉伯语近期进展',
@@ -706,6 +756,8 @@ def group_into_batches(query_result: dict, max_batches: int = 4) -> list[dict]:
         ('official_domestic', 'opposition_dissident'),
         ('financial', 'employee'),
         ('competitive', 'analyst'),
+        # 关系系统：升级与缓和是同一互动的两面，同批采集迫使同一 Researcher 对照两种信号
+        ('escalation_events', 'deescalation_diplomacy'),
     ]
 
     batched = []

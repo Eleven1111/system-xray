@@ -8,7 +8,7 @@ Think of it as a pathologist's toolkit for organizations: instead of examining c
 
 ## What It Does
 
-**Input**: A system name + type (e.g., "中美关系" / geopolitical, "ByteDance" / public_company)
+**Input**: A system name + type (e.g., "伊朗-美国-以色列冲突" / relational, "ByteDance" / public_company). Entity systems (companies, states, DAOs) and relational systems (conflicts, rivalries, alliances — where the *relationship itself* is the system) both supported; the seven dimensions are reinterpreted per type (see SKILL.md).
 
 **Process**:
 1. Auto-generates multi-perspective search queries (official, opposition, media, think tanks, regional, local-language)
@@ -16,8 +16,9 @@ Think of it as a pathologist's toolkit for organizations: instead of examining c
 3. Applies quality gates — freshness + **breaking-event sweep**, coverage, and **source verification that actually runs** (WebFetch spot-checks of high-stakes sources)
 4. Conditionally triggers Round 2 deep research (contradiction resolution, data anchoring, gap filling)
 5. Runs **seven-dimensional** diagnostic with calibrated scoring (1-5 per dimension, anchored to reference cases)
-6. Independently re-derives load-bearing factual claims (fact-check sub-agent) to catch confident-but-wrong synthesis
-7. Generates falsifiable predictions and tracks **time-valid** calibration across iterations
+6. Mechanically checks the score vector against **danger/survival-zone signatures** (e.g., D5≤2 + D2≤2 = the Enron/Theranos legitimacy-incentive collapse) and computes **feedback loops, leverage points, and prescription spillovers** from a declared causal graph — the logical consequences of the analyst's judgments are derived by code, not bookkeeping
+7. Independently re-derives load-bearing factual claims (fact-check sub-agent) to catch confident-but-wrong synthesis
+8. Generates falsifiable predictions and tracks **time-valid** calibration across iterations
 
 **Output**: Three files saved to Obsidian vault —
 
@@ -52,8 +53,10 @@ Orchestrator (Claude Code main agent)
   │
   ├─ [Conditional] PREDICTION VERIFICATION (time-valid: no early "confirmed")
   ├─ Research Brief → user confirmation
-  ├─ Competing Hypotheses Analysis (ACH, full mode)
+  ├─ Competing Hypotheses Analysis (ACH, full mode, tier-weighted scoring via ach_score)
   ├─ Seven-dimensional diagnosis (scored against calibration anchors)
+  ├─ detect_danger_zones() — auto-check against catastrophic/survival signatures
+  ├─ causal_graph: feedback loops + leverage ranking + prescription spillover simulation
   ├─ Claims ledger → triage thinly-attested → fact_check sub-agent re-derivation
   ├─ Generate 3-5 falsifiable predictions
   ├─ history_compare() + find_analogies() + calculate_prediction_accuracy(as_of_date)
@@ -150,7 +153,9 @@ system-xray/
 │   │   └── __init__.py
 │   ├── tools/
 │   │   ├── query_generator.py            # Multi-perspective query generation + language detection
-│   │   ├── history_compare.py            # Scoring delta + magnitude-aware analogies + time-valid Brier calibration
+│   │   ├── history_compare.py            # Scoring delta + magnitude-aware analogies + time-valid Brier calibration + danger-zone signatures
+│   │   ├── causal_graph.py               # Feedback loop detection + leverage ranking + intervention propagation + prescription cross-check
+│   │   ├── ach_score.py                  # Tier-weighted ACH hypothesis scoring (diagnosticity-aware)
 │   │   └── __init__.py
 │   └── __init__.py
 └── references/
@@ -228,6 +233,11 @@ python3 -m agent.agent -s "X" -t public_company --save-md --input report.md
 python3 -m agent.agent --radar --input scores.json                  # seven-dim radar SVG
 python3 -m agent.agent --build-audit --input brief.json             # itemized source audit (+ verification badges)
 
+# Analytical engines (pure computation — the logical consequences of declared judgments)
+python3 -m agent.agent --danger-zones --input scores.json           # auto-check catastrophic/survival signatures
+python3 -m agent.agent --causal --input graph.json                  # feedback loops + leverage + prescription spillover
+python3 -m agent.agent --ach-score --input ach.json                 # tier-weighted competing-hypothesis ranking
+
 # Reliability gates
 python3 -m agent.agent --verify-plan --input brief.json --sample 4  # pick sources to WebFetch-verify
 python3 -m agent.agent --triage-claims --input analysis.json        # pick load-bearing thin claims for fact_check
@@ -244,6 +254,7 @@ python3 -m agent.agent --triage-claims --input analysis.json        # pick load-
 | `dao` | DAOs, open-source communities, cooperatives |
 | `market` | Industry verticals, supply chains |
 | `platform` | Platform ecosystems |
+| `relational` | Multi-actor interaction systems — the system *is* the relationship, not any single entity: conflict constellations (Iran–US–Israel), strategic rivalries (US–China), alliances, deterrence standoffs. Health = manageability of the interaction, not friendliness |
 
 ## Output Style
 
