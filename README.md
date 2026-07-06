@@ -1,8 +1,10 @@
 # System Pathology
 
-A **seven-dimensional** diagnostic framework for complex systems — corporations, governments, DAOs, markets, geopolitical entities, and platform ecosystems. Built as a [Claude Code](https://claude.ai/claude-code) skill with an Orchestrator + parallel Researcher sub-agent architecture.
+*[中文版 README](README.zh-CN.md)*
 
-Think of it as a pathologist's toolkit for organizations: instead of examining cells under a microscope, it examines boundary topology, incentive architecture, information neurology, temporal metabolism, legitimacy narratives, coupling architecture, and power topology — then cross-references them to find the systemic pathologies that surface-level analysis misses.
+A **seven-dimensional** diagnostic framework for complex systems — corporations, governments, DAOs, markets, geopolitical entities, and platform ecosystems, plus **relational systems** where the system *is* the interaction itself (conflicts, rivalries, alliances) rather than any single entity. Built as a [Claude Code](https://claude.ai/claude-code) skill with an Orchestrator + parallel Researcher sub-agent architecture.
+
+Think of it as a pathologist's toolkit for organizations: instead of examining cells under a microscope, it examines boundary topology, incentive architecture, information neurology, temporal metabolism, legitimacy narratives, coupling architecture, and power topology — then cross-references them to find the systemic pathologies that surface-level analysis misses. The same seven questions are reinterpreted for relational systems (see "Relational Systems" below) — health there means the interaction's *manageability*, not its friendliness.
 
 > **On reliability (read this first).** This tool has an LLM analyze events that may post-date its training cutoff, using web-sourced evidence gathered by sub-agents. It can be wrong, and so can its own checkers. The system is built to **make its uncertainty visible, not to guarantee truth**: it tiers and verifies sources, records which process gates ran, calibrates its own past predictions, and independently re-derives load-bearing claims — then surfaces what remains thinly-attested for human judgment. Treat its output as a structured, self-audited analyst draft, not an oracle.
 
@@ -95,6 +97,46 @@ Cross-dimensional interactions are where the most dangerous pathologies hide:
 | Power-information doom loop | D7×D3 | Power concentration → information filtering → worse decisions → more concentration |
 | Succession-temporal squeeze | D7×D4 | Uncertain succession → shortened time horizons → no long-term investment |
 
+These interactions, plus the two Meadows-style outputs analysts actually need (which loops close, and which dimension is the highest-leverage intervention point), are computed by `agent/tools/causal_graph.py` from a declared set of causal edges — not read off a static table. See "Analytical Engines" below.
+
+## Relational Systems
+
+Most of the framework's system types are **entities** — a company, a state, a DAO — that persist independent of any specific counterpart. `relational` is different: the object of analysis is the **interaction itself** (a conflict, a rivalry, a deterrence standoff, an alliance), and it stops existing the moment any party is removed. Iran–Israel, US–China strategic competition, India–Pakistan, and the pre-1914 alliance system are relational systems; ByteDance is not (swap out its competitors and it's still ByteDance).
+
+The seven dimensions carry over, reinterpreted:
+
+| Dim | Entity-system question | Relational-system question |
+|-----|------------------------|------------------------------|
+| D1 | Hard walls / soft membranes | **Red lines & rules of engagement** — are they clear, respected, institutionalizing or eroding? |
+| D2 | Do rewards match survival needs? | **Payoff structure of restraint** — does escalating or holding back pay off? Is there a first-mover incentive? |
+| D3 | Can the system perceive reality? | **Signal fidelity & misperception risk** — do crisis channels exist and get used? How often is a strike misread as an attack, or restraint as weakness? |
+| D4 | Consuming the future to fund the present? | **Escalation ratchet & sustainability** — does each round raise the baseline of "normal" violence? Are there de-escalation off-ramps? |
+| D5 | Does the system's story hold? | **Coexistence narrative** — does each side still tell a story in which the other legitimately exists? |
+| D6 | Coupling too tight, too loose, misplaced? | **Entanglement & contagion channels** — do proxy networks and alliance obligations turn local sparks into systemic fires? |
+| D7 | Who decides, how does power transfer? | **Polarity & veto structure** — is the balance symmetric or shifting (Thucydides zone)? Who can veto an escalation? |
+
+Relational-specific pathologies: **escalation ratchet** (each round resets the "normal" baseline higher), **signal inversion** (restraint read as weakness, deterrence read as provocation — Able Archer 1983, July 1914), **rigid entanglement** (alliance/proxy chains that no single actor can unilaterally de-escalate), **first-mover incentive** (mobilization or strike-first structures that punish restraint), **coexistence narrative collapse** (neither side can sell compromise domestically once the other's legitimacy is fully denied).
+
+Research collection for `relational` is organized around interaction mechanics rather than single-entity health — escalation events, de-escalation/diplomatic channels, each party's official red lines, military balance, third-party mediators, and proxy linkages — with escalation and de-escalation perspectives **dispatched in the same Researcher batch** by design, so no single sub-agent sees only one side of the picture.
+
+## Historical Analogy Matching
+
+After scoring, the current system's seven-dimensional vector is matched against **51 historical reference cases** (`references/analogy-cases.json`) spanning 7 system types — including a `relational` track: the July Crisis of 1914, the Cuban Missile Crisis, US–USSR détente, Egypt–Israel's cold peace, India–Pakistan, the 2018–2020 US–China trade war, the Iran–Israel shadow war, and the eve of the 2022 Russia–Ukraine war.
+
+Matching uses a **magnitude-aware Euclidean distance**, not cosine similarity — cosine only compares direction, so an all-low crisis vector and an all-high healthy system can score as "identical" (they're proportionally similar even though one is failing and one is thriving). Same-system-type matches get a small additive tiebreaker (+0.08, clamped to 1.0) rather than a multiplicative boost, so a loose same-type match never beats a tight cross-type one. Results surface `similarity`, `outcome`, and `key_lesson` — analogies are heuristic context, not predictions: "structurally similar to X" doesn't mean "will follow X's trajectory."
+
+## Analytical Engines
+
+Three pure-computation tools turn the analyst's declared judgments into their logical consequences, rather than leaving that arithmetic to be redone by hand each time:
+
+| Engine | Input (analyst judgment) | Output (computed consequence) |
+|--------|---------------------------|-------------------------------|
+| `causal_graph.py` | A set of causal edges between dimensions (`{from, to, sign, strength}`) | All closed feedback loops, classified vicious/virtuous/antagonistic; Meadows-style leverage-point ranking; propagated spillover of any prescription across the whole graph; cross-prescription conflict detection |
+| `ach_score.py` | A 2–4 hypothesis set + a C/I/N evidence matrix with source tiers | Tier-weighted, diagnosticity-aware hypothesis ranking and status (`eliminated` / `stressed` / `active` / `untestable`) — a single Tier-1 inconsistency outweighs ten Tier-3 consistencies, and evidence that rates every hypothesis identically is down-weighted as non-diagnostic |
+| `history_compare.detect_danger_zones()` | The seven-dimensional score vector | Automatic check against 6 catastrophic and 4 survival dimensional signatures (e.g., D5≤2 + D2≤2 = the Enron/Theranos/FTX legitimacy-incentive collapse; D4≥4 + D6≥4 = an anti-fragile core) |
+
+The analyst still decides *what edges exist*, *what the evidence shows*, and *what the scores are* — these tools only make sure the downstream math (closure, ranking, propagation, signature matching) is derived rather than eyeballed.
+
 ## Source Tier System
 
 All evidence is classified by credibility:
@@ -158,11 +200,13 @@ system-xray/
 │   │   ├── ach_score.py                  # Tier-weighted ACH hypothesis scoring (diagnosticity-aware)
 │   │   └── __init__.py
 │   └── __init__.py
-└── references/
-    ├── scoring-calibration.md            # Anchor cases (Berkshire=5, Enron=1) to prevent score drift
-    ├── research-protocol.md              # Structured search queries by system type
-    ├── question-banks.md                 # Interview questions for insider-access users
-    └── diagnostic-schema.json            # Machine-readable JSON schema for structured output
+├── references/
+│   ├── scoring-calibration.md            # Anchor cases (Berkshire=5, Enron=1) per dimension per system type, incl. relational
+│   ├── research-protocol.md              # Structured search queries by system type
+│   ├── question-banks.md                 # Interview questions for insider-access users
+│   ├── analogy-cases.json                # 51 historical reference cases across 7 system types
+│   └── diagnostic-schema.json            # Machine-readable JSON schema for structured output
+└── tests/                                # 104 tests covering validation, tools, and the three analytical engines
 ```
 
 ## Installation
@@ -299,6 +343,8 @@ The framework synthesizes:
 - **Normal Accidents** (Perrow) — coupling architecture, cascade risk
 - **Governing the Commons** (Ostrom) — self-governance, shared resource management
 - **Leverage Points** (Meadows) — where to intervene in complex systems
+- **Crisis Stability & Deterrence Theory** (Schelling, Jervis) — signaling, escalation dynamics, and misperception in relational systems
+- **Analysis of Competing Hypotheses** (Heuer) — structured hypothesis testing against an evidence matrix, tier-weighted
 
 ## License
 
