@@ -1,0 +1,25 @@
+{
+  "_README": [
+    "决策增量评分表模板。每行 = 一个案例相对一条基线的判定。",
+    "填表前先读 evals/protocol.md §2 的三级判据，并确认预登记已提交。",
+    "baseline 取值：'A_current'（升级前 system-xray）或 'B_generic'（普通检索摘要+通用代理）。",
+    "score：0 = 仅换措辞/无证据；1 = 有证据的新解释但未改变调查或行动；",
+    "        2 = 有证据且明确改变调查优先级/行动选择/行动条件，并能指出新增的推理步骤。",
+    "rationale 必填——判据要求可被第三方复核。",
+    "两名评审分歧时填 arbitration（裁决人不能是原评审）；无裁决按预登记规则不计合格。",
+    "评审拿到的应是 blind_package() 产出的 items，不含 key。"
+  ],
+  "pre_registration_commit": "",
+  "threshold": {"qualified_cases": 8, "total_cases": 12},
+  "cases": [
+    {
+      "case_id": "CASE-01",
+      "baseline": "A_current",
+      "ratings": [
+        {"reviewer": "", "score": null, "rationale": ""},
+        {"reviewer": "", "score": null, "rationale": ""}
+      ],
+      "arbitration": null
+    }
+  ]
+}

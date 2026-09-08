@@ -527,7 +527,16 @@ Each score level is anchored to observable, verifiable characteristics.
 
 ## Cross-Reference: When Scores Interact
 
-**High-confidence danger zones** (patterns that reliably predict catastrophic failure):
+> **⚠️ 证据地位（S0 降格）：以下签名是假说，不是已验证的高置信规律。**
+> 它们由一组著名案例**事后归纳**而来。本项目没有对应的验证样本、基础率或错误率——
+> 从未统计过"有多少 D5≤2 + D2≤2 的系统其实没有崩塌"（假阳性率），也没有做过反向的
+> 漏报统计。全部案例都是结局已知后被选入的，选择偏差方向明确：失败案例更容易被记住和收录。
+>
+> 因此命中一条签名意味着**"值得按这条机制去查证"**，不意味着"灾难前兆已确认"。
+> 报告中引用签名时，须写成假说与调查线索，不得写成预测性结论。
+> 何时能升格：见升级方案 §14 的对照评估——需要冻结案例集、预登记判据与独立评审。
+
+**危险区签名（假说级）** — 值得优先查证的维度组合：
 
 | Pattern | Dimensional Signature | Historical Examples |
 |---------|----------------------|---------------------|
@@ -538,7 +547,7 @@ Each score level is anchored to observable, verifiable characteristics.
 | Power-information doom loop | D7≤2 + D3≤2 | Theranos, North Korea, late-era GE |
 | Succession crisis cascade | D7≤2 + D4≤2 | Family businesses without succession, post-founder startups |
 
-**High-confidence survival zone** (systems that can absorb significant shocks):
+**生存区签名（假说级）** — 同样是事后归纳，同样缺假阳性率：
 
 | Pattern | Dimensional Signature |
 |---------|----------------------|
@@ -558,3 +567,11 @@ Each score level is anchored to observable, verifiable characteristics.
 5. **Never score above 4 without specific evidence**: 5/5 is for exemplars only, not "seems fine"
 6. **Cross-type scores are not equivalent**: A 3/5 for a geopolitical system and a 3/5 for a public company reflect mid-range health within their respective scoring tracks, not identical conditions
 7. **Anchor cases can appear across types**: The same entity (e.g., Singapore) may anchor different scores in different system_type tracks, evaluated independently
+8. **无法识别时不评分**（S0）：证据不足写 `unknown`，维度不适用写 `not_applicable`——
+   **不得用中间分 3 填补**。3 分是"中等健康"这个实质判断，不是"我不知道"的占位符；
+   用它填空会把无知伪装成结论，并让雷达图、类比与历史对比一起被污染。
+9. **口径版本随分数一起记**（S0）：锚点或维度定义改变后，历史分数标为不可直接比较
+   （`score_basis_version`）。跨期对比时先检查可比性——指标改口径造成的"改善"不是系统改善。
+10. **锚点的证据地位**：本文件的锚点案例是**校准工具**，用于减少评分漂移；
+    它们没有构念效度检验，也没有跨评分者一致性统计。锚点让不同分析之间可比，
+    不保证分数对应任何外部可观测量。

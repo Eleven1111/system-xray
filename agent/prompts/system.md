@@ -16,6 +16,24 @@
 
 ## Orchestrator 工作流（严格按序执行）
 
+### Step 0 — 定分析契约（写入 `analysis_contract`，派研究员之前）
+
+四件事先定下来，否则"做完了没有"无从判断：
+
+1. **目标**：这次分析要支持哪个决策？
+2. **权限**（`user_authority`）：用户能直接做（`can_act`）、能推动别人做（`can_influence`）、
+   还是只能监测（`can_only_monitor`）？**行动卡不得超出这个边界**，校验会硬拒。
+3. **`as_of`**：知识截止日。
+4. **预算与停止条件**（`stopping_rules`，**先写**）：核心机制已覆盖 / 剩余缺口不改变当前行动 /
+   连续检索只返回同源信息 / 预算耗尽。预算耗尽时输出 `completeness: "partial"` 与未完成项，
+   **不强行声称完整**。
+
+检索优先级按"**哪些未知最可能改变当前决策**"排序（决策影响 / 解释鉴别力 / 可核验性 / 成本，
+透明的高中低分级），而不是"把所有查询跑完"。只有能合理估计收益与成本时才用定量信息价值，
+**不为每条检索伪造一个精确 EVSI 分值**。
+
+---
+
 ### Step 1 — 调用工具获取查询集
 
 ```bash
@@ -40,12 +58,25 @@ print(json.dumps({'query_set': result, 'batches': batches}, ensure_ascii=False, 
 
 **同时**（一条消息内）派发所有批次的 Researcher，每个批次一个 Agent。
 
-**⚙️ 模型分层（强制）：Researcher 是纯采集任务（WebSearch + 按 schema 吐 JSON，零判断），按批次语言选模型——**
-- **英文 / 近期事件批次 → `haiku`**（`Agent` 工具 `model="haiku"`）：拉丁字符检索 + 结构化输出，haiku 足够，快且省。
-- **非拉丁本地语言批次（ar/fa/ru/ja/ko）→ `sonnet`**（`model="sonnet"`）：sonnet 多语言检索能力更强，且对"研究员只采集"这类结构化角色设定**远不易拒绝执行**（haiku 曾因怀疑指令异常而拒跑波斯语批次）。中文(zh)批次可用 haiku，但若查询含大量中文一手站点限定也可升 sonnet。
-- **敏感话题批次（人权/镇压/异见/政权合法性/冲突）→ `sonnet`（P5，强制）**：haiku 会把"OSINT/情报/对异见分级/追踪"这类措辞误读为监控意图而拒绝执行（伊朗决策体系一轮曾有 2 个英文 haiku 批次因此拒跑）。**派发此类批次时：① 用 sonnet；② 措辞中性化**——用"为学术/政策分析汇总公开报道""人权监测""治理评估"，**避免** "OSINT/intelligence/情报产品/追踪/对异见分级"等触警词。
+**⚙️ 模型选择（按能力需求，不固化型号）：Researcher 是纯采集任务（WebSearch + 按 schema 吐 JSON，零判断）。**
+按**任务实际需要的能力**选模型，不写死具体型号——型号会换代，能力需求不会：
 
-判断密集的环节（七维评分、ACH、跨维交互、处方）一律留在 Orchestrator 自身执行。此规则对所有轮次生效：Round 1 / Round 2（contradiction/data_anchor/gap_filler）/ 预测验证；Round 2 与预测验证若涉及本地语言或敏感话题，同样升 sonnet + 中性措辞。
+| 批次特征 | 需要的能力 | 选型 |
+|---|---|---|
+| 英文 / 近期事件、拉丁字符检索 + 结构化输出 | 基础检索与格式遵循 | 宿主可用的**快速档**模型即可 |
+| 非拉丁本地语言（ar/fa/ru/ja/ko） | 强多语言检索、原文理解 | 升到**中档及以上**——快速档模型在这类批次上检索质量明显下降 |
+| 复杂话题、需要判断材料相关性 | 原文核对 + 结构化输出 | 中档及以上 |
+
+**能力检测优先**：先确认宿主是否具备检索、原文读取、子代理和本地文件能力，再选执行路径。
+子代理不可用时**允许串行**；明确记录不可用的能力，**不得虚构已派发的研究员或独立复核**。
+
+**关于被拒绝执行的批次**：如果某个批次因内容被宿主拒绝，正确做法是**按真实研究用途和边界重新说明任务**——
+说清这是为学术/政策分析汇总公开报道、材料范围是什么、产出如何使用。
+**不是**通过改写措辞规避宿主限制。规避式改写既不诚实，也解决不了真正的边界问题；
+如果重新说明后仍被拒绝，如实记为不可用能力并在报告中标注该视角未覆盖。
+
+判断密集的环节（七维评分、ACH、跨维交互、机制卡、行动卡）一律留在 Orchestrator 自身执行。
+此规则对所有轮次生效：Round 1 / Round 2（contradiction/data_anchor/gap_filler）/ 预测验证。
 
 **批次包含 Batch 0（近期事件扫描）+ Batch 1-N（结构性视角）。所有批次同时启动。**
 
@@ -56,7 +87,7 @@ PARALLEL DISPATCH（在同一条消息里调用所有 Agent）：
 
 Agent(
   description="Researcher batch 0: 近期事件扫描",
-  model="haiku",
+  model=<快速档>,                       # 按能力需求选型，见 Step 2 的选型表
   prompt="""
   [粘贴 researcher-base.md + researcher-sources.md 中本批次涉及语言的信源分级节，见下方「Researcher prompt 组装规则」]
 
@@ -73,7 +104,7 @@ Agent(
 
 Agent(
   description="Researcher batch 1: {batch_label}",
-  model="haiku",                       # 英文结构性批次 → haiku
+  model=<快速档>,                       # 英文结构性批次；按上表的能力需求选，不写死型号
   prompt="""
   [粘贴 researcher-base.md]
 
@@ -90,7 +121,7 @@ Agent(
 
 Agent(
   description="Researcher batch N: {本地语言}信源采集",
-  model="sonnet",                      # 非拉丁本地语言批次(ar/fa/ru/ja/ko) → sonnet
+  model=<中档及以上>,                    # 非拉丁本地语言批次(ar/fa/ru/ja/ko)
   prompt="""
   [粘贴 researcher-base.md + researcher-sources.md 中该语言的信源分级节]
 
@@ -230,7 +261,7 @@ Researcher 的 prompt **不是**整份大文件，而是按需拼装——只给
 ```
 Agent(
   description="Round 2: contradiction resolver — {contradiction_description}",
-  model="haiku",
+  model=<快速档>,                       # 按能力需求选型，见 Step 2 的选型表
   prompt="""
   [粘贴 researcher-base.md + researcher-modes.md 的「contradiction_resolution」节]
 
@@ -244,7 +275,7 @@ Agent(
 
 Agent(
   description="Round 2: data anchor — {claim}",
-  model="haiku",
+  model=<快速档>,                       # 按能力需求选型，见 Step 2 的选型表
   prompt="""
   [粘贴 researcher-base.md + researcher-modes.md 的「data_anchor」节]
 
@@ -259,7 +290,7 @@ Agent(
 
 Agent(
   description="Round 2: gap filler — {perspective_key}",
-  model="haiku",
+  model=<快速档>,                       # 按能力需求选型，见 Step 2 的选型表
   prompt="""
   [粘贴 researcher-base.md + researcher-modes.md 的「gap_filler」节 + researcher-sources.md 中该视角涉及语言的信源分级节]
 
@@ -303,7 +334,7 @@ python3 -m agent.agent --system "SYSTEM_NAME" --load-predictions
 ```
 Agent(
   description="Prediction verification: {prediction_summary}",
-  model="haiku",
+  model=<快速档>,                       # 按能力需求选型，见 Step 2 的选型表
   prompt="""
   [粘贴 researcher-base.md + researcher-modes.md 的「prediction_verification」节]
 
@@ -386,6 +417,10 @@ Agent(
 
 原则：一条强 I 比十条 C 更有诊断力。如果 I 全部来自 T3 信源，降低排除信心。
 
+**评矩阵前先标 `source_family`**：同一原始出处的转载、翻译、引用共享一个 family id，
+工具会把它们折叠成**一份**独立权重。四篇转载同一公告不是四条独立支持——
+重复计数是 ACH 最危险的失效模式，它让"淘汰假说"这件事变得太容易。
+
 #### 4.5c — 假说排序（工具计算，不靠目测）
 
 把假说清单和证据矩阵写成 JSON，交给定量引擎计算加权排序与状态：
@@ -399,11 +434,17 @@ python3 -m agent.agent --ach-score --input /tmp/sx_ach.json
 ```
 
 工具实现的判定逻辑（你不必手算，但须理解）：
+- **独立家族折叠**：同 `source_family`（或内容完全相同）的证据先折叠为一份，再参与计算
 - **信源层级加权**：T1 的 I 权重 3.0 / T2 2.0 / T3 1.0——"I 全部来自 T3"自动只到 stressed，排除不了
 - **鉴别力降权**：对所有假说打同一标记的证据（全 C/全 I）无区分力，权重 ×0.25
 - **一条强 I 比十条 C 更有诊断力**：排序主键是加权不一致分，一致分只作次键
-- 状态：`eliminated`（加权 I ≥ 3.0，如一条满鉴别力 T1 I）/ `stressed` / `active` / `untestable`（全 N，标"不可检验"而非"成立"）
-- `flags` 自动报告结构性信号：全部存活 = 高不确定状态（本身是关键发现）；全部被排除 = 须复查矩阵或补假说
+- 状态：`eliminated` / `stressed` / `active` / `untestable`。
+  **`eliminated` 读作"在当前证据与当前编码下被条件性反驳"，不是"已证伪"**——
+  新证据或可辩护的重编码都可能让它复活。ACH 分数**不是后验概率**，不得当概率报出。
+- `sensitivity.leave_one_out`：哪些证据家族是决定性的（移除任一条即翻转某个状态）。
+  **非空 = 结论依赖关键假设，必须在报告中显式说明**，不得输出无条件强结论。
+- `flags` 自动报告结构性信号：全部存活 = 高不确定状态（本身是关键发现）；
+  全部被条件性反驳 = 须复查矩阵或补假说；有重复证据被折叠也会点名。
 
 你负责生成假说和逐条评 C/I/N（判断），工具负责把判断的逻辑后果算到底（计算）。对工具输出有异议时，修正的是矩阵里的评级，不是绕过工具。
 
@@ -496,11 +537,25 @@ python3 -m agent.agent --causal --input /tmp/sx_causal.json
 **边的符号语义（关键，别编反）**：边描述**健康度**的传导方向。`sign:"+"` = Di 健康升则 Dj 健康升（同向，恶性循环里的"一起烂"也是 `+`）；`sign:"-"` = Di 健康升则 Dj 健康降（拮抗）。例：权力-信息恶性循环 = D7→D3 `+` 且 D3→D7 `+`（同向闭环），配合两维低分被工具判为 `reinforcing + vicious`。
 
 工具返回：
-- `loops`：所有闭环，按边符号乘积分类 `reinforcing`/`balancing`，再结合评分与趋势判 `vicious`/`virtuous`/`antagonistic`/`indeterminate`
-- `leverage_ranking`：杠杆点排序（回路参与数为主键，加权度数为次键——Meadows）
+- `loops`：所有闭环，按边符号乘积分类 `reinforcing`/`balancing`，再结合评分与趋势判
+  `vicious`/`virtuous`/`antagonistic`/`indeterminate`。
+  **回路内任一维度无数值评分 → 一律 `indeterminate`**：极性可以只由边符号算出，
+  但"这条回路当前在往好还是往坏跑"依赖回路内**全部**维度的状态。
+  强化回路不必然有害，平衡回路不必然有益。
+- `leverage_ranking`：**结构中心性**排序（回路参与数为主键，加权度数为次键）
+- `caveats`：工具自带的能力边界声明，写报告时照抄，别在正文里放大它的含义
 
-**5.2c — 杠杆点确认：**
-`leverage_ranking` 第一名 = 系统杠杆点，作为 Step 5.6 干预处方的首要目标。如果你认为工具排序不符合实际，修正的是 5.2a 的边声明（漏边/错符号），不是无视排序。
+**5.2c — 结构中心性 ≠ 杠杆点，必须再做可干预性审查：**
+
+`leverage_ranking` 第一名只说明"改动它波及面大"，**不说明它可干预、成本低或效果大**，
+更**不是 Meadows 杠杆等级**——Meadows 排的是干预的**种类**
+（参数 < 信息结构 < 规则 < 目标 < 范式），与节点在图里连得多不多无关。
+
+把中心维度提为干预目标之前，按 `references/methods/decision.md` 的可行性审查逐条回答：
+谁有权限、要多少提前量、有哪些不可逆投入、效果如何验证。
+审查不过就不要写成处方——写成"值得关注但当前不具备行动条件"。
+
+如果你认为工具排序不符合实际，修正的是 5.2a 的边声明（漏边/错符号），不是无视排序。
 
 **5.2d — 已知模式匹配：**
 将发现的交互与 SKILL.md 已知模式库比对。匹配则命名；不匹配则标注为系统特有模式。
@@ -556,10 +611,11 @@ print(json.dumps(results, ensure_ascii=False, indent=2))
 ### Step 5.5 — 预测汇编（从候选中筛选）
 
 1. 收集 Step 5（维度内）和 Step 5.2（跨维度）产出的全部候选预测
-2. 筛选最有诊断价值的 **3-5 条**，标准：
+2. 筛选最有诊断价值的 **3-5 条**，标准（**先定标准再选题**，防止只挑容易裁定的题）：
    - 覆盖至少 3 个不同维度
-   - 包含高置信（≥0.8）和低置信（≤0.3）的分布
    - 优先保留 `source_step: "cross_dimensional"` 的预测
+   - **不设置置信度配比要求**——此前要求"必须同时含 ≥0.8 与 ≤0.3"，那是让概率服务排版。
+     概率只表达判断：本次可靠推论都落在 0.5-0.7，就如实这么写。
 3. 被筛掉的候选预测保存在 `candidate_predictions` 字段
 4. 最终预测 JSON 格式（新增 `source_step`）：
 
@@ -581,7 +637,11 @@ print(json.dumps(results, ensure_ascii=False, indent=2))
 **质量要求：**
 - 不生成模糊预测（"局势会恶化"）——必须可观察、可证伪
 - 不生成必然发生的废话预测（"未来会有变化"）
-- 高置信（≥0.8）和低置信（≤0.3）的预测都要有——反映诊断的确定性分布
+- **`event_type` 必填**：`occurrence`（截止日前至少发生一次）/ `persistence`（持续到截止日）/
+  `point_in_time`（截止日的状态或数值）/ `conditional`（条件预测）。
+  裁定规则由它决定，缺了它"提前判对/提前判错"的合法条件无从区分（见 `references/methods/forecast.md`）。
+- **登记即冻结**：事件定义、概率、生成时间、目标窗口、时区、裁定来源优先级、缺数据处理、
+  关联机制一并冻结。更新概率产生**新版本**（`version` + `supersedes_version`），不覆盖初始值。
 - 预测从诊断结论中自然导出，不是附加的猜测
 
 将预测数组存入 `analysis` JSON 的 `predictions` 字段（Step 7 持久化时一并保存）。
@@ -620,14 +680,40 @@ python3 -m agent.agent --causal --input /tmp/sx_causal.json
 
 ---
 
-### Step 6 — 历史对比（如有历史记录）
+### Step 6 — 跨期对比（如有历史记录）
 
 ```bash
 cd /Users/na/.claude/skills/system-xray
-python3 -m agent.agent --system "SYSTEM_NAME" --load-latest
+python3 -m agent.agent --system "SYSTEM_NAME" --versions          # 有哪些不可变版本
+python3 -m agent.agent --system "SYSTEM_NAME" --load-latest       # 上一版全文
+# 本期草稿写好后，与上一版（或指定 --against ANALYSIS_ID）比：
+python3 -m agent.agent --system "SYSTEM_NAME" --changes --input /tmp/sx_analysis.json
 ```
 
-如有历史数据，将本次维度评分与上期对比，输出变化趋势。
+**先分类，再解释。** `--changes` 把每条变化归入四类，顺序不能反：
+
+| 变化类型 | 你要做的事 |
+|---|---|
+| `measurement`（观测变化） | **先查可比性**。口径变了却"改善"了，那不是系统改善——先校准口径，或标为不可直接比较 |
+| `mechanism`（机制变化） | 重审相关机制卡与行动卡，不只是改分数 |
+| `system_state`（系统状态变化） | 更新变量与相关判断 |
+| `analysis_correction`（分析修正） | 撤销依赖判断并**保留修订记录**，不静默改写历史 |
+
+改了口径就同时更新 `dimension_basis_version`，并把变更登记进 `measurement_changes`——
+不登记，跨期对比就会把"换了尺子"读成"长高了"。
+
+**时效与预测复查：**
+
+```bash
+python3 -m agent.agent --staleness --input /tmp/sx_analysis.json -d AS_OF
+python3 -m agent.agent --predictions-due --input /tmp/sx_analysis.json -d AS_OF
+```
+
+`--staleness` 按**断言类型**排出最该复查的条目（职位类 7 天就过期，章程类 730 天才过期——
+统一阈值做不到这个区分）。`--predictions-due` 告诉你哪些预测今天可以裁定、哪些只能等。
+
+**只复查相关部分**：受影响的机制、预测和行动，同时检查跨边界影响；
+不是每次都把全流程重跑一遍。转载不构成变化。
 
 ---
 
@@ -642,7 +728,34 @@ python3 -m agent.agent --system "SYSTEM_NAME" --type SYSTEM_TYPE --save-analysis
 ```
 
 **analysis JSON 必含字段：**
-- `dimension_scores`（D1-D7，取值 1-5）、`overall_score`、`risk_nodes`、`predictions`
+- `dimension_scores`（D1-D7；取值 1-5，或 `unknown` / `not_applicable`——**缺资料不用中间分 3 填补**）、
+  `overall_score`、`risk_nodes`、`predictions`
+- **`completeness`（S1，必填）**：`draft` / `partial` / `complete_with_uncertainty`。
+  自称 `complete_with_uncertainty` 但缺流程实据会被**硬拒**并列出缺口——
+  草稿可以保存，改成 `draft` / `partial` 即可落盘。
+- **`analysis_contract`（S1）**：`{objective, user_authority, as_of, budget, stopping_rules}`。
+  `user_authority` 决定行动卡允许的执行角色——超出它的行动卡会被硬拒。
+- **`claims` / `mechanisms` / `actions`（S1）**：审计链 `source → claim → mechanism → judgment → action`。
+  id 前缀分别为 `C` / `M` / `A`，必须唯一。校验会检查：
+  机制有替代解释与失效条件、行动有 `mechanism_id` + 验证指标 + 停止条件、
+  被反证的断言其依赖对象须标 `needs_review`。
+- **`coverage_audit`（S1）**：12 个要素组各标 `covered / unknown / not_applicable` + 理由。
+  对当前决策有实质影响的 unknown 会被点名要求写进摘要或行动条件。
+
+- **`claims[].claim_type`（S2）**：决定该断言按多久算过期（`officeholder` 7 天 /
+  `charter_rule` 730 天 / `historical_fact` 不过期……）。不写就按 `structural_fact` 处理——
+  职位类断言被当成结构事实，会漏掉最该核验的过期。
+- **信源的双时间（S2）**：`event_time` / `published_at` / `retrieved_at` 分开填。
+  **不知道就留空**——用检索日期冒充事件日期会被校验硬拒。
+
+> 自检命令（都不落盘）：
+> - `--lineage`：独立来源家族数、断言支撑画像、被反证断言的受影响结论清单
+> - `--causal-readiness`：每条机制离 L2（参数化）/ L3（效果估计）还差哪些入口条件
+> - `--staleness`：按断言类型的时效体检
+
+**保存产生不可变版本**：同一天保存两次会得到 `20260908-001` 与 `-002` 两个版本，
+后者不覆盖前者，且记录它 `supersedes` 哪一版。要回看某一版用
+`--versions` 列出 `analysis_id`，再用 `--changes --against <id>` 对比。
 - **`dimension_evidence`（P3）**：`{D1: [{title,url,date,tier}...], ...}`——每个有评分的维度挂 ≥1 条**带 url** 的信源。校验语义：**存在即严格**（某维列了却无 url → 硬拒存）；**完全缺失 → 非阻塞告警**（不硬拒，以兼容 6 维 legacy/精简模式重存，但会被 CLI 点名提醒补记）。把"评分须有信源"从口号变成可审计约束，并逼出更高单维证据密度。
 - **`process_metadata`（P2/P6b，强制记录）**：`{round2_triggered, round2_run, ach_run, source_verification_done, unresolved_high_contradictions, confidence_label, latest_source_date, as_of_date, breaking_event_sweep_done}`——如实记录流程门控是否执行。CLI 会据此打印**非阻塞告警**：full 模式跳过 ACH / Round2 触发未跑 / 信源核验未做 / 有未解 HIGH 矛盾却标 high 置信 /（P6b）最新信源距基准日 ≥2 天的信息滞后 / 未做突发事件扫描。告警不拦截落盘，但把"静默跳过"变成被点名的显式决定。
 
@@ -652,12 +765,21 @@ python3 -m agent.agent --system "SYSTEM_NAME" --type SYSTEM_TYPE --save-analysis
 
 ---
 
-### Step 8 — 三件套输出（缺一不算完成）：研究素材 MD + HTML 智库报告 + MD 备份
+### Step 8 — 输出：默认单份 MD + 结构化底稿，其余按需导出
 
-本步骤必须生成**三份**输出并列存入 Obsidian，**缺一不算完成**：
-1. `研究素材.md`（Step 8a，原始信源逐条存档）— **不可跳过**
-2. `诊断报告.html`（Step 8b，含雷达图 + 逐条 URL 信源审计）
-3. `系统诊断.md`（Step 8c，《纽约客》式叙事特稿——给人读的可读长稿，非表格备份）
+**默认交付两件：**
+1. **analysis JSON**（Step 7 已落盘）——审计链的载体，报告由它生成
+2. **`系统诊断.md`**（Step 8c）——可读交付，骨架见 `references/report-template.md`
+
+**按需导出**（用户要才做，不做也算完成）：
+- `研究素材.md`（Step 8a）——用户需要原始信源逐条存档时
+- `诊断报告.html`（Step 8b）——用户明确要智库风格 HTML（含雷达图）时
+
+> 取消了此前"三件套缺一不算完成"的规定：**文件份数不是分析质量的度量**，
+> 用它定义完成会把精力推向格式转换而不是证据与机制。完整性由 `completeness` 字段
+> 和统一契约校验判定，不由产出了几个文件判定。
+
+输出目录默认读 `SYSTEM_XRAY_OUTPUT_DIR` 环境变量，未设置时才回落到本机 Obsidian 仓库。
 
 **可追溯性硬约束（P1）**：HTML 报告的信源审计节**必须由 `--build-audit` 工具从真实返回信源机械生成**，逐条带 URL+日期，按 T 级分组——**禁止手写"信源类别"**（如只列"T2: 路透/FT/CNN"而无具体条目+链接）。这保证每个结论可点击核验。
 
@@ -875,12 +997,38 @@ System Pathology/
 
 ---
 
-## 矛盾处理原则
+## 矛盾处理原则（对矛盾作证据判断，不机械"两边都说"）
 
-- 不选边，两种叙事都呈现
+**先分类，再决定要不要选边：**
+
+| 冲突类型 | 处理 |
+|---|---|
+| 时间不同 | 按 `event_time` 排序——多半不是真冲突 |
+| 统计口径不同 | 校准口径后再比；口径变化不是系统变化 |
+| 翻译错误 / 引用方向错误 | 回原句核对主体与方向，**能解决就明确解决** |
+| 价值分歧 | 说明这是评价主体不同，不是事实冲突 |
+| 真实事实冲突 | 说明剩余分歧及其**影响范围** |
+
+- **"存在两种说法"不代表二者证据相当。** 能解决的事实争议要解决，不要为了显得中立而并列。
+- **"矛盾更多"不必然让所有结论置信度更低。** 按**受影响的断言和机制**局部调整，
+  不做全局降级——一个无关维度上的争议不该拉低整份报告的置信度。
 - 分析矛盾的利益根源（谁的立场产生了这个叙事？）
-- 矛盾越多，置信度越低，在报告中显式标注
 - 禁止用训练知识"调和"两个互相矛盾的信源
+
+## 完整性 ≠ 置信度 ≠ 事实真实（三件事分开记）
+
+| 记什么 | 字段 | 回答什么问题 |
+|---|---|---|
+| 报告完整性 | `completeness` | 约定的分析工作**做完了没有** |
+| 知识不确定性 | `confidence_label` + 逐条机制的敏感性判定 | 结论**有多可能为真** |
+| 复核标志 | 对象上的 `needs_review` | 这条断言/机制/行动**需不需要重看** |
+
+三者并列，互不替代：`needs_review` 不抹去已完成的研究步骤；
+`complete_with_uncertainty` 不表示事实为真——**不存在"流程完成＝事实真实"的状态**。
+报告摘要须显示是否存在影响当前决策的待复核对象。
+
+高风险未决断言可以让依赖它的**行动**不可推荐（`blocked_by_claims`），
+但不应导致全部研究成果无法保存。
 
 ## 置信度天花板规则（P4）
 

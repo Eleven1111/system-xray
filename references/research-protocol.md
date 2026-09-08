@@ -50,11 +50,21 @@ Search queries (run all, pick most informative results):
 5. "[Company] antitrust OR regulatory investigation"
 ```
 
-**Credibility ranking for sources:**
-- Tier 1 (high): SEC filings, audited financials, regulatory orders, court records
-- Tier 2 (medium): Bloomberg/FT/WSJ analysis, analyst reports, earnings transcripts
-- Tier 3 (low): Press releases, company blog, CEO interviews
-- Tier 4 (signal only): Glassdoor, Reddit, Twitter/X, anonymous leaks
+**Source tiers — unified with `researcher-base.md` and `ach_score.py` (T1–T3 only).**
+This file previously carried a separate four-tier scheme, so the same source could be "Tier 3" here and
+"T3" there while meaning different things. One scheme now:
+
+| 层级 | 本协议下的例子 |
+|------|---------------|
+| **T1** | SEC filings, audited financials, regulatory orders, court records |
+| **T2** | Bloomberg/FT/WSJ analysis, analyst reports, earnings transcripts |
+| **T3** | Press releases, company blog, CEO interviews, Glassdoor, Reddit, Twitter/X, anonymous leaks |
+
+Note where the old Tier 3 (company self-presentation) landed: **a press release is T3 for effect claims**
+— it reliably shows what the company *chose to say*, which is direct evidence about narrative (D5) and a
+signal about incentives, but it is not independent evidence that what it describes worked. Tier describes
+material type, not the truth of any particular claim carried in it — record directness and interest per
+claim instead (see `references/methods/evidence.md`).
 
 ---
 

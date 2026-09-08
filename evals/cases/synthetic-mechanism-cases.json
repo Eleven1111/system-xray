@@ -1,0 +1,470 @@
+{
+  "schema_version": 1,
+  "library_role": "evaluation",
+  "provenance": {
+    "coding": "constructed",
+    "why_synthetic": "训练知识污染无法仅靠材料截断消除，历史案例的模型知识泄漏也无法证明已消除。合成案例的真相由构造决定，不存在泄漏问题——代价是它只能测逻辑，不能测现实。",
+    "what_it_tests": "确定性引擎在**已知真相**下能否得出正确结论：证据折叠、假说裁定、敏感性报告、依赖传播。",
+    "what_it_does_not_test": "研究采集质量、机制判断本身是否贴近现实、报告可读性、决策增量。那些需要真实材料与人类评审（见 evals/protocol.md）。",
+    "keep_unpublished": "这些案例一旦公开就可能进入后续模型的训练集。改动时请同步更新此说明。"
+  },
+  "cases": [
+    {
+      "id": "SYN-01",
+      "title": "转载陷阱：三条'独立信源'其实是一条",
+      "ground_truth": {
+        "true_hypothesis": "H1",
+        "trap": "H1 的三条不一致证据全部转载自同一份公告；不折叠就会把 H1 误判为已被反驳",
+        "decisive_property": "source_family 折叠"
+      },
+      "hypotheses": [
+        {
+          "id": "H1",
+          "statement": "产能下降源于设备检修排期"
+        },
+        {
+          "id": "H2",
+          "statement": "产能下降源于订单萎缩"
+        }
+      ],
+      "evidence": [
+        {
+          "description": "行业媒体A转载公告：订单同比持平",
+          "tier": 2,
+          "source_family": "vendor-notice-0601",
+          "ratings": {
+            "H1": "I",
+            "H2": "I"
+          }
+        },
+        {
+          "description": "行业媒体B转载同一公告",
+          "tier": 2,
+          "source_family": "vendor-notice-0601",
+          "ratings": {
+            "H1": "I",
+            "H2": "I"
+          }
+        },
+        {
+          "description": "行业媒体C转载同一公告",
+          "tier": 2,
+          "source_family": "vendor-notice-0601",
+          "ratings": {
+            "H1": "I",
+            "H2": "I"
+          }
+        },
+        {
+          "description": "设备供应商检修合同（一手）",
+          "tier": 1,
+          "source_family": "maint-contract",
+          "ratings": {
+            "H1": "C",
+            "H2": "I"
+          }
+        }
+      ],
+      "expected": {
+        "surviving": [
+          "H1"
+        ],
+        "refuted": [
+          "H2"
+        ],
+        "must_collapse_to_families": 2
+      }
+    },
+    {
+      "id": "SYN-02",
+      "title": "一条 T1 强不一致证据应当反驳一个假说",
+      "ground_truth": {
+        "true_hypothesis": "H2",
+        "trap": "无",
+        "decisive_property": "层级加权的不一致分"
+      },
+      "hypotheses": [
+        {
+          "id": "H1",
+          "statement": "监管处罚导致业务暂停"
+        },
+        {
+          "id": "H2",
+          "statement": "内部系统故障导致业务暂停"
+        }
+      ],
+      "evidence": [
+        {
+          "description": "监管机构官网公告：期间无针对该主体的处罚",
+          "tier": 1,
+          "source_family": "regulator-registry",
+          "ratings": {
+            "H1": "I",
+            "H2": "N"
+          }
+        },
+        {
+          "description": "工程事故报告",
+          "tier": 1,
+          "source_family": "incident-report",
+          "ratings": {
+            "H1": "N",
+            "H2": "C"
+          }
+        }
+      ],
+      "expected": {
+        "surviving": [
+          "H2"
+        ],
+        "refuted": [
+          "H1"
+        ],
+        "must_collapse_to_families": 2
+      }
+    },
+    {
+      "id": "SYN-03",
+      "title": "全中性证据：不可检验，不得升格为成立",
+      "ground_truth": {
+        "true_hypothesis": null,
+        "trap": "所有证据对两个假说都无鉴别力，容易被当成'两个都成立'",
+        "decisive_property": "untestable 状态"
+      },
+      "hypotheses": [
+        {
+          "id": "H1",
+          "statement": "士气下降源于薪酬结构"
+        },
+        {
+          "id": "H2",
+          "statement": "士气下降源于晋升通道堵塞"
+        }
+      ],
+      "evidence": [
+        {
+          "description": "离职率上升（对两种解释都一致）",
+          "tier": 2,
+          "source_family": "hr-report",
+          "ratings": {
+            "H1": "N",
+            "H2": "N"
+          }
+        },
+        {
+          "description": "匿名论坛抱怨帖",
+          "tier": 3,
+          "source_family": "forum",
+          "ratings": {
+            "H1": "N",
+            "H2": "N"
+          }
+        }
+      ],
+      "expected": {
+        "surviving": [],
+        "refuted": [],
+        "all_untestable": true,
+        "must_collapse_to_families": 2
+      }
+    },
+    {
+      "id": "SYN-04",
+      "title": "决定性单证据：必须报告留一敏感性",
+      "ground_truth": {
+        "true_hypothesis": "H2",
+        "trap": "结论完全悬于一条证据；不报敏感性就成了无条件强结论",
+        "decisive_property": "leave_one_out 非空"
+      },
+      "hypotheses": [
+        {
+          "id": "H1",
+          "statement": "库存积压源于需求下滑"
+        },
+        {
+          "id": "H2",
+          "statement": "库存积压源于物流中断"
+        }
+      ],
+      "evidence": [
+        {
+          "description": "港口停运记录（一手）",
+          "tier": 1,
+          "source_family": "port-log",
+          "ratings": {
+            "H1": "I",
+            "H2": "C"
+          }
+        },
+        {
+          "description": "背景行业综述",
+          "tier": 3,
+          "source_family": "trade-review",
+          "ratings": {
+            "H1": "N",
+            "H2": "N"
+          }
+        }
+      ],
+      "expected": {
+        "surviving": [
+          "H2"
+        ],
+        "refuted": [
+          "H1"
+        ],
+        "must_report_sensitivity": true,
+        "must_collapse_to_families": 2
+      }
+    },
+    {
+      "id": "SYN-05",
+      "title": "低层级不一致证据只能施压，不能反驳",
+      "ground_truth": {
+        "true_hypothesis": "H1",
+        "trap": "两条 T3 传闻看起来很多，但不足以反驳",
+        "decisive_property": "T3 的 I 只到 stressed"
+      },
+      "hypotheses": [
+        {
+          "id": "H1",
+          "statement": "高管离职属常规轮岗"
+        },
+        {
+          "id": "H2",
+          "statement": "高管离职源于内部调查"
+        }
+      ],
+      "evidence": [
+        {
+          "description": "匿名爆料贴A",
+          "tier": 3,
+          "source_family": "leak-a",
+          "ratings": {
+            "H1": "I",
+            "H2": "C"
+          }
+        },
+        {
+          "description": "匿名爆料贴B（不同来源）",
+          "tier": 3,
+          "source_family": "leak-b",
+          "ratings": {
+            "H1": "I",
+            "H2": "C"
+          }
+        },
+        {
+          "description": "公司公告轮岗名单",
+          "tier": 1,
+          "source_family": "company-notice",
+          "ratings": {
+            "H1": "C",
+            "H2": "N"
+          }
+        }
+      ],
+      "expected": {
+        "surviving": [
+          "H1",
+          "H2"
+        ],
+        "refuted": [],
+        "h1_status": "stressed",
+        "must_collapse_to_families": 3
+      }
+    },
+    {
+      "id": "SYN-06",
+      "title": "全 I 无鉴别力：对所有假说都不一致的证据不应把全部假说反驳掉",
+      "ground_truth": {
+        "true_hypothesis": null,
+        "trap": "一条对所有假说都打 I 的证据，若不降权会把整个假说集清空",
+        "decisive_property": "鉴别力降权"
+      },
+      "hypotheses": [
+        {
+          "id": "H1",
+          "statement": "增长放缓源于渠道饱和"
+        },
+        {
+          "id": "H2",
+          "statement": "增长放缓源于价格战"
+        }
+      ],
+      "evidence": [
+        {
+          "description": "宏观数据与两种解释都不符",
+          "tier": 1,
+          "source_family": "macro-data",
+          "ratings": {
+            "H1": "I",
+            "H2": "I"
+          }
+        }
+      ],
+      "expected": {
+        "surviving": [
+          "H1",
+          "H2"
+        ],
+        "refuted": [],
+        "must_collapse_to_families": 1
+      }
+    },
+    {
+      "id": "SYN-07",
+      "title": "翻译版本：六个语种是一条证据",
+      "ground_truth": {
+        "true_hypothesis": "H1",
+        "trap": "同一声明的四个语种译本；按条计数会把 H1 反驳掉（4×2.0=8.0 ≫ 阈值），折叠后只剩 2.0，仅施压不反驳",
+        "decisive_property": "source_family 折叠（跨语言）"
+      },
+      "hypotheses": [
+        {
+          "id": "H1",
+          "statement": "冲突降级源于第三方斡旋"
+        },
+        {
+          "id": "H2",
+          "statement": "冲突降级源于一方弹药耗尽"
+        }
+      ],
+      "evidence": [
+        {
+          "description": "官方声明（英文）",
+          "tier": 2,
+          "source_family": "statement-0714",
+          "ratings": {
+            "H1": "I",
+            "H2": "C"
+          }
+        },
+        {
+          "description": "官方声明（阿拉伯语译本）",
+          "tier": 2,
+          "source_family": "statement-0714",
+          "ratings": {
+            "H1": "I",
+            "H2": "C"
+          }
+        },
+        {
+          "description": "官方声明（波斯语译本）",
+          "tier": 2,
+          "source_family": "statement-0714",
+          "ratings": {
+            "H1": "I",
+            "H2": "C"
+          }
+        },
+        {
+          "description": "官方声明（俄语译本）",
+          "tier": 2,
+          "source_family": "statement-0714",
+          "ratings": {
+            "H1": "I",
+            "H2": "C"
+          }
+        },
+        {
+          "description": "斡旋方会谈纪要（一手）",
+          "tier": 1,
+          "source_family": "mediation-minutes",
+          "ratings": {
+            "H1": "C",
+            "H2": "I"
+          }
+        },
+        {
+          "description": "后勤补给记录",
+          "tier": 2,
+          "source_family": "logistics",
+          "ratings": {
+            "H1": "N",
+            "H2": "I"
+          }
+        }
+      ],
+      "expected": {
+        "surviving": [
+          "H1"
+        ],
+        "refuted": [
+          "H2"
+        ],
+        "h1_status": "stressed",
+        "must_collapse_to_families": 3
+      }
+    },
+    {
+      "id": "SYN-08",
+      "title": "依赖传播：被反证的断言必须拖动依赖它的机制与行动",
+      "ground_truth": {
+        "true_hypothesis": null,
+        "trap": "断言被独立复核推翻，但依赖它的机制仍显示'已获支持'",
+        "decisive_property": "needs_review 传播"
+      },
+      "analysis": {
+        "completeness": "partial",
+        "output_mode": "full",
+        "dimension_scores": {
+          "D3": 2
+        },
+        "analysis_contract": {
+          "objective": "决定是否上报风险",
+          "user_authority": "can_influence",
+          "as_of": "2026-09-08"
+        },
+        "claims": [
+          {
+            "id": "C1",
+            "statement": "上报规则于 5 月收紧",
+            "status": "contradicted",
+            "claim_type": "policy_in_force",
+            "event_time": "2026-09-01",
+            "loads": [
+              "M1"
+            ],
+            "sources": [
+              {
+                "url": "https://internal.example/spec",
+                "role": "contradicts",
+                "directness": "direct",
+                "tier": 1,
+                "source_family": "spec-v3",
+                "published_at": "2026-09-02",
+                "retrieved_at": "2026-09-08"
+              }
+            ]
+          }
+        ],
+        "mechanisms": [
+          {
+            "id": "M1",
+            "explains": "自报事故数下降",
+            "chain": "规则收紧 → 降级上报",
+            "alternatives": [
+              "事故确实减少"
+            ],
+            "failure_conditions": [
+              "口径统一后差异消失"
+            ],
+            "discriminating_predictions": [
+              "独立监控不随自报数下降"
+            ],
+            "supporting_claims": [
+              "C1"
+            ],
+            "causal_level": "L1_explanatory"
+          }
+        ]
+      },
+      "expected": {
+        "needs_review_targets": [
+          "M1"
+        ]
+      }
+    }
+  ]
+}

@@ -22,6 +22,8 @@ def _valid_analysis():
                 'confidence': 0.7,
                 'dimension_link': 'D2',
                 'source_step': 'dimension_analysis',
+                # S0：事件语义必填——裁定窗口按类型决定（见 history_compare 的裁定表）
+                'event_type': 'occurrence',
             }
         ],
     }

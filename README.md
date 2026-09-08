@@ -22,15 +22,17 @@ Think of it as a pathologist's toolkit for organizations: instead of examining c
 7. Independently re-derives load-bearing factual claims (fact-check sub-agent) to catch confident-but-wrong synthesis
 8. Generates falsifiable predictions and tracks **time-valid** calibration across iterations
 
-**Output**: Three files saved to Obsidian vault —
+**Output**: one Markdown report plus the structured record it was generated from. Everything else is
+an on-demand export — file count is not a measure of analytical quality.
 
-| File | Format | Content |
-|------|--------|---------|
-| `{date} {name} 研究素材.md` | Markdown | Raw sources, contradictions, coverage gaps |
-| `{date} {name} 诊断报告.html` | HTML | Brookings/CSIS think-tank style long-form article with inline radar chart |
-| `{date} {name} 系统诊断.md` | Markdown | Full report backup |
+| File | Format | When | Content |
+|------|--------|------|---------|
+| structured `analysis.json` | JSON | always | The audit chain: claims → mechanisms → judgments → predictions / actions. Persisted to `~/.system_pathology/data/` for longitudinal tracking |
+| `{date} {name} 系统诊断.md` | Markdown | always | The readable report (skeleton: `references/report-template.md`) |
+| `{date} {name} 研究素材.md` | Markdown | on request | Raw sources, contradictions, coverage gaps |
+| `{date} {name} 诊断报告.html` | HTML | on request | Brookings/CSIS think-tank style long-form article with inline radar chart |
 
-Plus a structured JSON persisted to `~/.system_pathology/data/` for longitudinal tracking.
+Report files go to `$SYSTEM_XRAY_OUTPUT_DIR` when set, falling back to the configured Obsidian vault.
 
 ## Architecture
 
@@ -71,7 +73,7 @@ Orchestrator (Claude Code main agent)
 - Tools are pure-computation Python called via Bash — no LLM in the loop for query generation, scoring comparison, persistence, or validation.
 - Round 2 is conditional and capped (max 5 Researchers, no Round 3).
 - **Skips are made visible, not impossible**: a `validate_analysis()` gate hard-rejects malformed/out-of-range data before persistence; `process_warnings()` flags any gate that was skipped (ACH, Round 2, source verification, breaking-event sweep) — turning silent omissions into recorded decisions.
-- Each analysis generates falsifiable predictions; the next analysis auto-verifies (time-valid) and computes Brier-score calibration.
+- Each analysis generates falsifiable predictions with an explicit `event_type`; the next analysis auto-verifies under that event's adjudication rules and computes Brier-score calibration against a base-rate baseline.
 
 ## Seven Diagnostic Dimensions
 
@@ -97,7 +99,7 @@ Cross-dimensional interactions are where the most dangerous pathologies hide:
 | Power-information doom loop | D7×D3 | Power concentration → information filtering → worse decisions → more concentration |
 | Succession-temporal squeeze | D7×D4 | Uncertain succession → shortened time horizons → no long-term investment |
 
-These interactions, plus the two Meadows-style outputs analysts actually need (which loops close, and which dimension is the highest-leverage intervention point), are computed by `agent/tools/causal_graph.py` from a declared set of causal edges — not read off a static table. See "Analytical Engines" below.
+These interactions, plus which loops close and which dimension is most structurally central, are computed by `agent/tools/causal_graph.py` from a declared set of causal edges — not read off a static table. Note that **structural centrality is not a Meadows leverage level**: Meadows ranks *kinds* of intervention (parameters < information flows < rules < goals < paradigms), while centrality only says a change would ripple widely. Promoting a central dimension to an intervention target requires the separate feasibility review in `references/methods/decision.md`. See "Analytical Engines" below.
 
 ## Relational Systems
 
@@ -123,7 +125,9 @@ Research collection for `relational` is organized around interaction mechanics r
 
 After scoring, the current system's seven-dimensional vector is matched against **51 historical reference cases** (`references/analogy-cases.json`) spanning 7 system types — including a `relational` track: the July Crisis of 1914, the Cuban Missile Crisis, US–USSR détente, Egypt–Israel's cold peace, India–Pakistan, the 2018–2020 US–China trade war, the Iran–Israel shadow war, and the eve of the 2022 Russia–Ukraine war.
 
-Matching uses a **magnitude-aware Euclidean distance**, not cosine similarity — cosine only compares direction, so an all-low crisis vector and an all-high healthy system can score as "identical" (they're proportionally similar even though one is failing and one is thriving). Same-system-type matches get a small additive tiebreaker (+0.08, clamped to 1.0) rather than a multiplicative boost, so a loose same-type match never beats a tight cross-type one. Results surface `similarity`, `outcome`, and `key_lesson` — analogies are heuristic context, not predictions: "structurally similar to X" doesn't mean "will follow X's trajectory."
+Matching uses a **magnitude-aware Euclidean distance**, not cosine similarity — cosine only compares direction, so an all-low crisis vector and an all-high healthy system can score as "identical" (they're proportionally similar even though one is failing and one is thriving). Same-system-type matches get a small additive tiebreaker (+0.08, clamped to 1.0) rather than a multiplicative boost, so a loose same-type match never beats a tight cross-type one. Results surface `similarity`, `outcome`, `key_lesson`, plus the coverage they were computed over and their coding provenance — analogies are heuristic context, not predictions: "structurally similar to X" doesn't mean "will follow X's trajectory."
+
+**The library is a teaching set, not a validation set.** Every score was coded after the outcome was known, by a coder not blinded to it, and the selection over-represents famous failures. The file stores `as_of_known` and `hindsight` separately so replay can isolate outcomes (`find_analogies(..., blind=True)` drops `outcome` and `key_lesson` entirely), which makes the contamination mechanically excludable — it does not remove it from the existing scores. Using this library to validate the method would prove hindsight with hindsight.
 
 ## Analytical Engines
 
@@ -131,7 +135,7 @@ Three pure-computation tools turn the analyst's declared judgments into their lo
 
 | Engine | Input (analyst judgment) | Output (computed consequence) |
 |--------|---------------------------|-------------------------------|
-| `causal_graph.py` | A set of causal edges between dimensions (`{from, to, sign, strength}`) | All closed feedback loops, classified vicious/virtuous/antagonistic; Meadows-style leverage-point ranking; propagated spillover of any prescription across the whole graph; cross-prescription conflict detection |
+| `causal_graph.py` | A set of causal edges between dimensions (`{from, to, sign, strength}`) | All closed feedback loops, classified vicious/virtuous/antagonistic (or `indeterminate` when any dimension in the loop is unscored); structural-centrality ranking (**not** a Meadows leverage level); heuristic ordinal spillover of any prescription across the graph — direction and reach only, never an effect magnitude; cross-prescription conflict detection |
 | `ach_score.py` | A 2–4 hypothesis set + a C/I/N evidence matrix with source tiers | Tier-weighted, diagnosticity-aware hypothesis ranking and status (`eliminated` / `stressed` / `active` / `untestable`) — a single Tier-1 inconsistency outweighs ten Tier-3 consistencies, and evidence that rates every hypothesis identically is down-weighted as non-diagnostic |
 | `history_compare.detect_danger_zones()` | The seven-dimensional score vector | Automatic check against 6 catastrophic and 4 survival dimensional signatures (e.g., D5≤2 + D2≤2 = the Enron/Theranos/FTX legitimacy-incentive collapse; D4≥4 + D6≥4 = an anti-fragile core) |
 
@@ -159,8 +163,8 @@ Each analysis generates 3-5 **falsifiable predictions** with:
 - Linked diagnostic dimension (D1-D7)
 
 On repeat analysis of the same system, prior predictions are automatically loaded, verified against current evidence, and scored:
-- **Time-valid resolution**: a "X holds through date D" prediction *cannot* be marked `confirmed` before D (it can still break) — only `falsified` early or `on_track`. `calculate_prediction_accuracy(as_of_date=...)` auto-downgrades any premature "confirmed" to `on_track` and excludes it from scoring, so the system can't manufacture a fake "100% hit rate" from unresolved predictions.
-- **Brier score** (confidence-weighted, computed only when ≥3 predictions have genuinely resolved)
+- **Event-type-aware resolution**: which early verdicts are legitimate depends on what kind of event the prediction names. `persistence` ("X holds through D") cannot be confirmed before D but can be falsified early; `occurrence` ("X happens before D") is the mirror image — it can be confirmed early but **not** falsified early, unless a pre-defined impossibility condition has been established; `point_in_time` waits for the target date in both directions; `conditional` is not scored at all until its trigger fires. Illegitimate early verdicts are downgraded to unresolved and excluded from scoring, so the system can neither manufacture a fake "100% hit rate" nor score itself as wrong on a prediction that still has 73 years to run.
+- **Brier score** — standard `mean((p - y)^2)`, computed only when ≥3 predictions have genuinely resolved, and always reported alongside the sample's own base-rate baseline, the sample size and the unresolved ratio. Below 30 resolved events the tool says so explicitly: a low Brier on a handful of predictions is not evidence of calibration.
 - **High-confidence misses** (confidence ≥0.7 but falsified — flagged as warnings)
 - Results rendered in both the Research Brief and the final HTML report
 
@@ -174,7 +178,26 @@ Because the analysis runs on LLM-gathered, possibly post-cutoff evidence, the sy
 | **Process warnings** (`process_warnings`) | Non-blocking flags for skipped gates | ACH/Round-2/source-verification/breaking-event sweep skipped; stale latest-source; uncorroborated load-bearing claims | (Relies on honestly-recorded `process_metadata`) |
 | **Source verification** (`--verify-plan` → WebFetch) | Spot-checks high-stakes sources (T1/T2 + quantitative) for reachability and title/number match | Dead/fabricated URLs, mismatched specific numbers | Plausible-but-wrong synthesis on a *real* source |
 | **Claims fact-check** (`--triage-claims` → `fact_check` sub-agent) | Independently re-derives load-bearing thinly-attested claims from fresh search | Confident misattribution single/thinly-sourced (e.g. wrong office-holder) | Wrong synthesis that happens to be *well*-attested |
-| **Time-valid calibration** | Forbids confirming a prediction before its horizon | Fake "100% hit rate" from unresolved predictions | — |
+| **Event-type calibration** | Only allows the early verdicts that the prediction's event type permits | Fake "100% hit rate" from unresolved predictions; scoring a prediction as wrong 73 years before its deadline | Whether the event type was classified honestly in the first place |
+| **Evidence lineage** (`--lineage`) | Collapses reprints/translations into source families; propagates a contradicted claim to every conclusion that loads on it | Repetition masquerading as corroboration; a refuted fact silently left holding up a mechanism | Reworded reprints that were never tagged with a shared family |
+| **Cross-period comparability** (`--changes`) | Classifies each change as system-state / mechanism / **measurement** / analysis-correction | A metric redefinition being read as improvement | Undeclared basis changes — it can only see what was registered |
+| **Causal readiness gate** (`--causal-readiness`) | Lists what a mechanism still lacks before it may claim L2 or L3 | Effect promises generated from L1 arrows and ordinal scores | Whether the identification strategy is actually defensible |
+| **Immutable versions** | Every save is a new version; nothing overwrites history | Two same-day analyses silently collapsing into one | — |
+
+**What has and has not been verified.** 227 unit/contract tests pass; `evals/adversarial.py` runs
+11 automated adversarial cases (duplicate evidence, basis change, premature adjudication, authority
+overreach, prompt injection in source material, …); `evals/synthetic.py` runs 8 mechanism cases whose
+ground truth is fixed by construction, plus an ablation experiment. Every guard is backed by a
+**negative control** that turns its case red when the guard is disabled — and the ablation itself is
+negative-controlled: an ablation that breaks nothing fails the test suite, because a zero delta means
+those cases never exercised that module.
+
+That is the whole of the evidence, and it is evidence about **logic on constructed inputs**. It says
+nothing about research accuracy, causal-identification validity, decision usefulness, or whether
+predictions beat a baseline. The protocol for those — 12 frozen real cases, three-path comparison,
+blind independent review, ≥30 resolved predictions — is in `evals/protocol.md`, its instruments are
+built and tested, and it **has not been run**, because the missing inputs are real research, human
+reviewers and elapsed time.
 
 **The honest residual.** These gates are triage + spot-check + independent re-derivation, **not** a truth guarantee. A confident-wrong claim that is well-attested (≥2 plausible sources) can still pass; the fact-check sub-agent is itself a fallible LLM. This is the irreducible floor of having an LLM analyze post-cutoff events. The design goal is **surfacing what is thin or contradicted for human judgment**, not certifying correctness — verification-completeness is a human endpoint, not another gate.
 
@@ -184,29 +207,44 @@ Because the analysis runs on LLM-gathered, possibly post-cutoff evidence, the sy
 system-xray/
 ├── SKILL.md                              # Skill metadata + full diagnostic protocol
 ├── agent/
-│   ├── agent.py                          # CLI: query preview, history, persistence, validation, audit, verify-plan, triage-claims
+│   ├── agent.py                          # CLI: query preview, history, persistence, contract validation, audit, verify-plan, triage-claims, lineage
 │   ├── prompts/
 │   │   ├── system.md                     # Orchestrator prompt (full pipeline + quality gates)
 │   │   ├── researcher-base.md            # Researcher universal core (workflow + EN tiers + schema + neutral framing)
 │   │   ├── researcher-sources.md         # Per-language source tier tables (paste relevant only)
 │   │   └── researcher-modes.md           # Round 2 + verification modes: gap_filler / contradiction_resolution / data_anchor / prediction_verification / fact_check
+│   ├── validation.py                     # Unified contract validation (structure / dependencies / status / forecast semantics / staleness / injection scan) + L2-L3 causal readiness gate + ablation switches
 │   ├── store/
-│   │   ├── db.py                         # Persistence + validate_analysis + process_warnings + source-audit/verification + claims triage + radar SVG
+│   │   ├── db.py                         # Persistence + validate_analysis + process_warnings + completeness derivation + source-audit/verification + claims triage + radar SVG
 │   │   └── __init__.py
 │   ├── tools/
 │   │   ├── query_generator.py            # Multi-perspective query generation + language detection
-│   │   ├── history_compare.py            # Scoring delta + magnitude-aware analogies + time-valid Brier calibration + danger-zone signatures
-│   │   ├── causal_graph.py               # Feedback loop detection + leverage ranking + intervention propagation + prescription cross-check
-│   │   ├── ach_score.py                  # Tier-weighted ACH hypothesis scoring (diagnosticity-aware)
+│   │   ├── history_compare.py            # Scoring delta + coverage-gated analogies + event-type-aware Brier calibration + danger-zone signatures
+│   │   ├── causal_graph.py               # Feedback loop detection + structural-centrality ranking + heuristic propagation + prescription cross-check
+│   │   ├── ach_score.py                  # Independent-family collapse + tier-weighted ACH scoring + leave-one-out sensitivity
+│   │   ├── evidence_lineage.py           # Source families, claim support profiles, contradiction propagation to dependent conclusions
+│   │   ├── temporal.py                   # Bitemporal checks + per-claim-type staleness + measurement comparability + judgement-change classification
+│   │   ├── forecast_registry.py          # Prediction freezing and versioning, pre-declared review policy, event-type adjudication windows
+│   │   ├── stock_flow.py                 # L2 stock-and-flow local model: first-order delays, parameter-range corner sweep, robustness verdict (refuses to conclude without ranges)
+│   │   ├── causal_adapter.py             # L3 effect estimation: backend detection (DoWhy if present, else a labelled minimal DiD), placebo and leave-one-out refutations
 │   │   └── __init__.py
 │   └── __init__.py
 ├── references/
 │   ├── scoring-calibration.md            # Anchor cases (Berkshire=5, Enron=1) per dimension per system type, incl. relational
 │   ├── research-protocol.md              # Structured search queries by system type
 │   ├── question-banks.md                 # Interview questions for insider-access users
+│   ├── report-template.md                # The single report skeleton (decision summary → audit appendix)
+│   ├── methods/                          # On-demand method cards: evidence / mechanism / dynamics / forecast / decision
 │   ├── analogy-cases.json                # 51 historical reference cases across 7 system types
-│   └── diagnostic-schema.json            # Machine-readable JSON schema for structured output
-└── tests/                                # 104 tests covering validation, tools, and the three analytical engines
+│   └── diagnostic-schema.json            # The single data-contract spec: claims → mechanisms → judgments → predictions / actions
+├── evals/
+│   ├── adversarial.py                    # §14.3 adversarial suite — 11 automated cases + 1 honestly-flagged prompt-gated case
+│   ├── synthetic.py                      # Constructed-ground-truth mechanism cases + ablation experiment
+│   ├── decision_increment.py             # Blind packaging + the §14.2 rubric (both reviewers must say 2; disagreement needs arbitration)
+│   ├── cases/                            # Synthetic case library, ratings template
+│   ├── protocol.md                       # Pre-registered comparison protocol — NOT YET RUN on real cases
+│   └── README.md                         # What each suite proves and what it does not
+└── tests/                                # 227 tests: contract layer, temporal updates, causal levels, adversarial + synthetic cases (with negative controls), validation, analytical engines
 ```
 
 ## Installation
@@ -217,7 +255,7 @@ This is a Claude Code skill — it runs inside Claude Code's agent infrastructur
 
 - [Claude Code](https://claude.ai/claude-code) (CLI, desktop app, or IDE extension)
 - Python 3.10+ (for the computation tools)
-- An Obsidian vault at the configured path (for report output)
+- A writable output directory — set `SYSTEM_XRAY_OUTPUT_DIR`, or use an Obsidian vault at the configured default path
 
 ### Setup
 
@@ -229,11 +267,13 @@ git clone https://github.com/Eleven1111/system-xray.git ~/.claude/skills/system-
 
 2. The skill auto-registers via `SKILL.md` frontmatter. No `pip install` needed — all Python tools use only the standard library.
 
-3. (Optional) Adjust the Obsidian vault path in `agent/store/db.py` if yours differs from the default:
+3. Point report output at your own directory (no code edit needed):
 
-```python
-OBSIDIAN_DIR = Path('/your/obsidian/vault/System Pathology')
+```bash
+export SYSTEM_XRAY_OUTPUT_DIR="/your/output/directory"
 ```
+
+Without it, output falls back to the Obsidian vault path hardcoded in `agent/store/db.py`.
 
 ## Usage
 
@@ -279,12 +319,20 @@ python3 -m agent.agent --build-audit --input brief.json             # itemized s
 
 # Analytical engines (pure computation — the logical consequences of declared judgments)
 python3 -m agent.agent --danger-zones --input scores.json           # auto-check catastrophic/survival signatures
-python3 -m agent.agent --causal --input graph.json                  # feedback loops + leverage + prescription spillover
+python3 -m agent.agent --causal --input graph.json                  # feedback loops + structural centrality + prescription spillover
 python3 -m agent.agent --ach-score --input ach.json                 # tier-weighted competing-hypothesis ranking
 
 # Reliability gates
 python3 -m agent.agent --verify-plan --input brief.json --sample 4  # pick sources to WebFetch-verify
 python3 -m agent.agent --triage-claims --input analysis.json        # pick load-bearing thin claims for fact_check
+python3 -m agent.agent --lineage --input analysis.json               # source families + claim support + contradiction propagation
+python3 -m agent.agent --causal-readiness --input analysis.json      # what each mechanism still needs before it may claim L2/L3
+python3 -m agent.agent --system "X" --versions                       # immutable analysis versions
+python3 -m agent.agent --system "X" --changes --input new.json       # judgement changes + measurement comparability
+python3 -m agent.agent --staleness --input analysis.json             # per-claim-type staleness check
+python3 -m agent.agent --predictions-due --input analysis.json       # which predictions are adjudicable today
+
+python3 -m evals.adversarial                                         # §14.3 adversarial suite
 ```
 
 ### Supported System Types

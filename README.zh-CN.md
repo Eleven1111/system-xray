@@ -18,19 +18,21 @@
 3. 执行质量门控——新鲜度 + **突发事件扫描**、覆盖率、以及**真正执行的信源核验**（对高权重信源做 WebFetch 抽查）
 4. 条件触发 Round 2 深度研究（矛盾求证、数据锚定、缺口填补）
 5. 执行**七维度**诊断，评分（1-5 分）锚定于参考案例
-6. 机械化比对评分向量与**危险区/生存区签名**（如 D5≤2 + D2≤2 = Enron/Theranos 型合法性-激励崩塌），并从一张声明的因果图中计算**反馈回路、杠杆点与处方溢出**——分析师判断的逻辑后果由代码推导，不是靠手工记账
+6. 机械化比对评分向量与**危险区/生存区签名**（如 D5≤2 + D2≤2 = Enron/Theranos 型合法性-激励崩塌；这些签名是**事后归纳的假说**，无验证样本与误报率，命中=调查线索而非已验证前兆），并从一张声明的因果图中计算**反馈回路、结构中心性与处方溢出**——分析师判断的逻辑后果由代码推导，不是靠手工记账
 7. 独立复核载荷性事实断言（fact-check sub-agent），抓住"听起来合理但记错了"的综述类错误
 8. 生成可证伪预测，并跨轮次追踪**时序合规**的校准分数
 
-**输出**：三份文件保存到 Obsidian 仓库——
+**输出**：默认一份 Markdown 报告 + 一份结构化 analysis JSON；以下为按需导出的完整形态——
 
-| 文件 | 格式 | 内容 |
-|------|------|------|
-| `{日期} {系统名} 研究素材.md` | Markdown | 原始信源、矛盾信号、覆盖缺口 |
-| `{日期} {系统名} 诊断报告.html` | HTML | Brookings/CSIS 智库风格长文，内嵌雷达图 |
-| `{日期} {系统名} 系统诊断.md` | Markdown | 完整报告备份 |
+| 文件 | 格式 | 何时生成 | 内容 |
+|------|------|---------|------|
+| 结构化 `analysis.json` | JSON | 总是 | 审计链：断言 → 机制 → 判断 → 预测/行动。持久化到 `~/.system_pathology/data/` 供纵向追踪 |
+| `{日期} {系统名} 系统诊断.md` | Markdown | 总是 | 可读交付（骨架见 `references/report-template.md`） |
+| `{日期} {系统名} 研究素材.md` | Markdown | 按需 | 原始信源、矛盾信号、覆盖缺口 |
+| `{日期} {系统名} 诊断报告.html` | HTML | 按需 | Brookings/CSIS 智库风格长文，内嵌雷达图 |
 
-外加结构化 JSON 持久化到 `~/.system_pathology/data/`，供纵向追踪。
+报告输出目录优先读 `SYSTEM_XRAY_OUTPUT_DIR` 环境变量，未设置时回落到配置的 Obsidian 仓库。
+**文件份数不是分析质量的度量**——完整性由 `completeness` 字段与统一契约校验判定。
 
 ## 架构
 
@@ -97,7 +99,7 @@ Orchestrator（Claude Code 主 agent）
 | 权力-信息恶性循环 | D7×D3 | 权力集中 → 信息过滤 → 更差决策 → 更集中 |
 | 继承-时间挤压 | D7×D4 | 继承不确定 → 时间视野缩短 → 无长期投资 |
 
-这些交互，加上分析师真正需要的两个 Meadows 式产出（哪些回路闭合、哪个维度是最高杠杆干预点），由 `agent/tools/causal_graph.py` 从一组声明的因果边计算得出——不是照抄静态表格。详见下文"分析引擎"一节。
+这些交互，加上哪些回路闭合、哪个维度结构上最中心，由 `agent/tools/causal_graph.py` 从一组声明的因果边计算得出——不是照抄静态表格。注意**结构中心性不是 Meadows 杠杆等级**：Meadows 排的是干预的种类（参数 < 信息结构 < 规则 < 目标 < 范式），中心性只说明改动它波及面大。把中心维度提为干预目标还需另做可干预性审查（见 `references/methods/decision.md`）。详见下文"分析引擎"一节。
 
 ## 关系系统
 
@@ -123,7 +125,9 @@ Orchestrator（Claude Code 主 agent）
 
 评分完成后，当前系统的七维评分向量会与 **51 个历史参考案例**（`references/analogy-cases.json`）比对，覆盖 7 种系统类型——包含一个 `relational` 轨道：1914 年七月危机、古巴导弹危机、美苏缓和、埃以冷和平、印巴对峙、2018-2020 中美贸易战、伊以影子战争，以及 2022 年俄乌开战前夕。
 
-匹配采用**量级敏感的欧氏距离**，而非余弦相似度——余弦只比较方向，会让全低的危机向量与全高的健康系统被判定为"完全相同"（两者比例接近，尽管一个在崩溃、一个在兴盛）。同类型系统只获得小幅加性 tiebreaker（+0.08，clamp 到 1.0）而非乘性加成，确保松散匹配的同类型永远不会反超紧密匹配的跨类型。结果呈现 `similarity`、`outcome`、`key_lesson`——类比是启发式的背景参考，不是预测："结构上与 X 相似"不等于"会重蹈 X 的覆辙"。
+匹配采用**量级敏感的欧氏距离**，而非余弦相似度——余弦只比较方向，会让全低的危机向量与全高的健康系统被判定为"完全相同"（两者比例接近，尽管一个在崩溃、一个在兴盛）。同类型系统只获得小幅加性 tiebreaker（+0.08，clamp 到 1.0）而非乘性加成，确保松散匹配的同类型永远不会反超紧密匹配的跨类型。结果呈现 `similarity`、`outcome`、`key_lesson`，以及**相似度是在几个维度上算出来的**与**评分的编码方式**——类比是启发式的背景参考，不是预测："结构上与 X 相似"不等于"会重蹈 X 的覆辙"。
+
+**这个库是教学集，不是验证集。** 每条评分都是在结局已知之后编定的，编码者没有被隔离结局，选样也偏向著名失败案例。文件现在把 `as_of_known` 与 `hindsight` 分开存放，回放时可整块隔离结局（`find_analogies(..., blind=True)` 直接删掉 `outcome` 与 `key_lesson`）——这让污染变得**可见且可机械排除**，但并不等于已有评分被去污染。拿它验证方法有效性，等于用后见之明证明后见之明。
 
 ## 分析引擎
 
@@ -131,7 +135,7 @@ Orchestrator（Claude Code 主 agent）
 
 | 引擎 | 输入（分析师的判断） | 输出（计算得出的后果） |
 |------|---------------------|----------------------|
-| `causal_graph.py` | 一组维度间因果边（`{from, to, sign, strength}`） | 全部闭合反馈回路，分类为恶性/良性/拮抗；Meadows 式杠杆点排序；任意处方在全图上的传播溢出；处方间冲突检测 |
+| `causal_graph.py` | 一组维度间因果边（`{from, to, sign, strength}`） | 全部闭合反馈回路，分类为恶性/良性/拮抗（回路内任一维度未评分则为 `indeterminate`）；结构中心性排序（**不是** Meadows 杠杆等级）；任意处方在全图上的启发式序数溢出——只给方向与波及范围，不给效果幅度；处方间冲突检测 |
 | `ach_score.py` | 2-4 个假说 + 一张带信源层级的 C/I/N 证据矩阵 | 信源层级加权、鉴别力感知的假说排序与状态（`eliminated` / `stressed` / `active` / `untestable`）——一条 T1 不一致证据的权重压过十条 T3 一致证据，对所有假说打同一标记的证据被判定无鉴别力而降权 |
 | `history_compare.detect_danger_zones()` | 七维评分向量 | 自动比对 6 个灾难性签名与 4 个生存性签名（如 D5≤2 + D2≤2 = Enron/Theranos/FTX 型合法性-激励崩塌；D4≥4 + D6≥4 = 反脆弱内核） |
 
@@ -159,8 +163,8 @@ Orchestrator（Claude Code 主 agent）
 - 关联的诊断维度（D1-D7）
 
 对同一系统重复分析时，上期预测会自动加载、依据当前证据验证并评分：
-- **时序合规的裁定**：一条"X 持续到日期 D"的预测，在 D 之前*不可能*被判 `confirmed`（它随时可能被打破）——只能提前 `falsified` 或判 `on_track`。`calculate_prediction_accuracy(as_of_date=...)` 会自动把任何提前的"confirmed"降级为"on_track"并排除出评分，杜绝系统用未到期的预测炮制虚假的"100% 命中率"。
-- **Brier 分数**（置信度加权，仅在 ≥3 条预测真正到期裁定时计算）
+- **按事件类型裁定**：哪些提前裁定合法，取决于预测说的是哪类事件。`persistence`（"X 持续到 D"）到期前不能判成立、但可以提前判不成立；`occurrence`（"X 在 D 前发生"）正好相反——可以提前判成立，但**不能**提前判不成立，除非预先定义的不可能条件已被证实；`point_in_time` 两个方向都等目标时点；`conditional` 在触发条件发生前不计分。不合法的提前裁定一律降级为未决并排除出评分——系统既不能用未到期预测炮制"100% 命中率"，也不会把一条还有 73 年才到期的预测算成自己判错了。
+- **Brier 分数**——标准 `mean((p - y)^2)`，仅在 ≥3 条真正到期裁定时计算，且始终同时报出**同样本基础率基准**、样本量与未决比例。已裁定样本不足 30 条时工具会明确 flag：少量预测的低 Brier 不构成校准良好的证据。
 - **高置信落空**（置信度 ≥0.7 但被证伪——标记为警示）
 - 结果同时呈现在 Research Brief 和最终 HTML 报告中
 
@@ -174,7 +178,21 @@ Orchestrator（Claude Code 主 agent）
 | **流程告警**（`process_warnings`） | 对被跳过门控的非阻塞标记 | ACH/Round 2/信源核验/突发事件扫描被跳过；最新信源过期；未佐证的载荷性断言 | （依赖如实记录的 `process_metadata`） |
 | **信源核验**（`--verify-plan` → WebFetch） | 对高权重信源（T1/T2 + 定量声明）抽查可达性与标题/数字是否一致 | 失效/伪造的 URL、数字不符 | 依托*真实*信源但综述错误的内容 |
 | **断言事实核查**（`--triage-claims` → `fact_check` sub-agent） | 独立重新求证载荷性、佐证单薄的断言 | 自信但张冠李戴的错误（如任职者搞错） | 佐证*充分*但综合错误的内容 |
-| **时序合规校准** | 禁止在到期前判预测为已证实 | 用未到期预测炮制虚假"100% 命中率" | — |
+| **按事件类型校准** | 只允许该事件类型许可的提前裁定 | 用未到期预测炮制虚假"100% 命中率"；把一条还有 73 年到期的预测算成判错 | 事件类型本身是否被如实分类 |
+| **证据血缘**（`--lineage`） | 把转载/翻译折叠为来源家族；被反证的断言向所有依赖它的结论传播 | 重复冒充佐证；一条已被推翻的事实仍在悄悄支撑某个机制 | 未标同一家族的改写式转载 |
+| **跨期可比性**（`--changes`） | 把每条变化归入 系统状态/机制/**观测口径**/分析修正 | 口径改动被读作系统改善 | 未登记的口径变更——它只看得见被登记的部分 |
+| **因果能力入口门**（`--causal-readiness`） | 列出某机制离 L2/L3 还差哪些条件 | 由 L1 箭头与序数分数生成的效果承诺 | 识别策略本身是否真的站得住 |
+| **不可变版本** | 每次保存产生新版本，历史不被覆盖 | 同日两次分析静默合并成一次 | — |
+
+**已验证与未验证的边界。** 227 个单元/契约测试通过；`evals/adversarial.py` 跑通 11 条自动对抗用例
+（重复证据、口径变更、提前裁定、越权行动、材料中的提示词注入……）；`evals/synthetic.py` 跑通 8 条
+**真相由构造决定**的机制案例，并做了消融实验。每条防护都配负控——关掉它，对应用例立刻变红；
+消融本身也有负控：一个什么都不破坏的消融会让测试失败，因为零差值意味着那批案例根本没测到那个模块。
+
+证据到此为止，而且它是关于**构造输入上的逻辑**的证据。它没有说明研究准确性、因果识别有效性、
+决策有用性，或预测是否优于基线。那些的协议——12 个冻结真实案例、三路径对照、独立盲评、
+≥30 条已裁定预测——写在 `evals/protocol.md`，**仪器已建好并通过测试，但尚未执行**，
+因为缺的输入是真实研究、人类评审和时间流逝。
 
 **诚实的残余风险。** 这些门控是分诊 + 抽查 + 独立重新求证，**不是**真相保证。一条自信错误但佐证"充分"（≥2 个看似可靠的信源）的断言仍可能通过；fact_check sub-agent 本身也是可能犯错的 LLM。这是让 LLM 分析训练截止之后事件的不可消除的底线。设计目标是**把佐证单薄或存在矛盾的部分暴露给人类判断**，而不是认证正确性——核验完备性是一个人类终点，不是另一道门控。
 
@@ -184,29 +202,44 @@ Orchestrator（Claude Code 主 agent）
 system-xray/
 ├── SKILL.md                              # Skill 元数据 + 完整诊断协议
 ├── agent/
-│   ├── agent.py                          # CLI：查询预览、历史记录、持久化、校验、审计、信源核验计划、断言分诊
+│   ├── agent.py                          # CLI：查询预览、历史记录、持久化、契约校验、审计、信源核验计划、断言分诊、证据血缘
 │   ├── prompts/
 │   │   ├── system.md                     # Orchestrator 提示词（完整管道 + 质量门控）
 │   │   ├── researcher-base.md            # Researcher 通用核心（采集流程 + 英文分级 + schema + 中性框架）
 │   │   ├── researcher-sources.md         # 分语言信源层级表（按需粘贴）
 │   │   └── researcher-modes.md           # Round 2 + 验证模式：gap_filler / contradiction_resolution / data_anchor / prediction_verification / fact_check
+│   ├── validation.py                     # 统一契约校验（结构 / 依赖 / 状态 / 预测语义 / 时效 / 注入扫描）+ L2-L3 因果能力入口门 + 消融开关
 │   ├── store/
-│   │   ├── db.py                         # 持久化 + validate_analysis + process_warnings + 信源审计/核验 + 断言分诊 + 雷达图 SVG
+│   │   ├── db.py                         # 持久化 + validate_analysis + process_warnings + 完整性推导 + 信源审计/核验 + 断言分诊 + 雷达图 SVG
 │   │   └── __init__.py
 │   ├── tools/
 │   │   ├── query_generator.py            # 多视角查询生成 + 语言检测
-│   │   ├── history_compare.py            # 评分差值 + 量级敏感类比 + 时序合规 Brier 校准 + 危险区签名
-│   │   ├── causal_graph.py               # 反馈回路检测 + 杠杆点排序 + 干预传播 + 处方交叉检查
-│   │   ├── ach_score.py                  # 信源层级加权的 ACH 假说评分（鉴别力感知）
+│   │   ├── history_compare.py            # 评分差值 + 覆盖门控的类比 + 按事件类型裁定的 Brier 校准 + 危险区签名
+│   │   ├── causal_graph.py               # 反馈回路检测 + 结构中心性排序 + 启发式干预传播 + 处方交叉检查
+│   │   ├── ach_score.py                  # 独立证据家族折叠 + 信源层级加权 ACH 评分 + 留一敏感性
+│   │   ├── evidence_lineage.py           # 来源家族、断言支撑画像、反证向依赖结论的传播
+│   │   ├── temporal.py                   # 双时间校验 + 按断言类型的时效 + 口径可比性 + 判断变更分类
+│   │   ├── forecast_registry.py          # 预测冻结与版本、预先声明的复盘策略、按事件类型的裁定窗口
+│   │   ├── stock_flow.py                 # L2 存量—流量局部模型：一阶延迟 + 参数区间角点扫描 + 稳健性判定（缺区间即拒绝出结论）
+│   │   ├── causal_adapter.py             # L3 效果估计：后端检测（有 DoWhy 用 DoWhy，否则用明确标注的最小 DiD）+ 安慰剂/留一反驳
 │   │   └── __init__.py
 │   └── __init__.py
 ├── references/
 │   ├── scoring-calibration.md            # 各维度各系统类型的锚点案例（含 relational），防止评分漂移
 │   ├── research-protocol.md              # 按系统类型分类的结构化搜索查询
 │   ├── question-banks.md                 # 面向内部人访问用户的访谈问题库
+│   ├── report-template.md                # 单一报告骨架（决策摘要 → 审计附录）
+│   ├── methods/                          # 按需加载的方法卡：证据 / 机制 / 动态 / 预测 / 决策
 │   ├── analogy-cases.json                # 51 个历史参考案例，覆盖 7 种系统类型
-│   └── diagnostic-schema.json            # 结构化输出的机器可读 JSON schema
-└── tests/                                # 104 个测试，覆盖校验逻辑、工具函数与三个分析引擎
+│   └── diagnostic-schema.json            # 数据契约的唯一规范：断言 → 机制 → 判断 → 预测/行动
+├── evals/
+│   ├── adversarial.py                    # §14.3 对抗用例套件——11 条自动 + 1 条诚实标注的提示词层用例
+│   ├── synthetic.py                      # 真相由构造决定的合成机制案例 + 消融实验
+│   ├── decision_increment.py             # 盲评打包 + §14.2 判据（两人均为 2 才合格，分歧须裁决）
+│   ├── cases/                            # 合成案例库、评分表模板
+│   ├── protocol.md                       # 对照评估协议——真实案例部分**尚未执行**
+│   └── README.md                         # 每个套件证明什么、不证明什么
+└── tests/                                # 227 个测试：契约层、跨期更新、能力分层、对抗与合成案例（含负控）、校验逻辑与分析引擎
 ```
 
 ## 安装
@@ -229,11 +262,13 @@ git clone https://github.com/Eleven1111/system-xray.git ~/.claude/skills/system-
 
 2. Skill 通过 `SKILL.md` 的 frontmatter 自动注册。无需 `pip install`——所有 Python 工具只用标准库。
 
-3.（可选）如果你的 Obsidian 仓库路径与默认值不同，在 `agent/store/db.py` 中调整：
+3. 把报告输出指向你自己的目录（无需改代码）：
 
-```python
-OBSIDIAN_DIR = Path('/your/obsidian/vault/System Pathology')
+```bash
+export SYSTEM_XRAY_OUTPUT_DIR="/your/output/directory"
 ```
+
+不设置时回落到 `agent/store/db.py` 中硬编码的 Obsidian 仓库路径。
 
 ## 使用方法
 
@@ -279,7 +314,15 @@ python3 -m agent.agent --build-audit --input brief.json             # 逐条信�
 
 # 分析引擎（纯计算——把声明的判断变成其逻辑后果）
 python3 -m agent.agent --danger-zones --input scores.json           # 自动比对灾难性/生存性签名
-python3 -m agent.agent --causal --input graph.json                  # 反馈回路 + 杠杆点 + 处方溢出
+python3 -m agent.agent --causal --input graph.json                  # 反馈回路 + 结构中心性 + 处方溢出
+python3 -m agent.agent --lineage --input analysis.json              # 来源家族 + 断言支撑 + 反证传播
+python3 -m agent.agent --causal-readiness --input analysis.json     # 各机制离 L2/L3 还差哪些入口条件
+python3 -m agent.agent --system "X" --versions                      # 列出不可变分析版本
+python3 -m agent.agent --system "X" --changes --input new.json      # 判断变更 + 口径可比性
+python3 -m agent.agent --staleness --input analysis.json            # 按断言类型的时效体检
+python3 -m agent.agent --predictions-due --input analysis.json      # 今天哪些预测可裁定
+
+python3 -m evals.adversarial                                        # §14.3 对抗用例套件
 python3 -m agent.agent --ach-score --input ach.json                 # 信源层级加权的竞争假说排序
 
 # 可靠性门控

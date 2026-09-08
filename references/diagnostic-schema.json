@@ -3,23 +3,112 @@
   "title": "SystemPathologyDiagnosticReport",
   "description": "Structured output schema for system pathology analyses. Enables tracking, comparison, and longitudinal monitoring across analyses.",
   "type": "object",
-  "required": ["metadata", "cartography", "dimensions", "cross_dimensional", "risk_nodes", "scenarios", "prescriptions", "predictions"],
+  "required": [
+    "metadata",
+    "completeness",
+    "cartography",
+    "dimensions",
+    "cross_dimensional",
+    "risk_nodes",
+    "scenarios",
+    "prescriptions",
+    "predictions"
+  ],
   "properties": {
-
+    "completeness": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "partial",
+        "complete_with_uncertainty"
+      ],
+      "description": "Process completeness — deliberately SEPARATE from knowledge uncertainty. draft = structure or research steps unfinished; partial = core material/process/scope coverage insufficient; complete_with_uncertainty = the agreed analytical work is done while mechanisms and facts remain uncertain. There is no state meaning 'process complete therefore facts true'."
+    },
+    "analysis_contract": {
+      "type": "object",
+      "description": "Agreed before analysis starts; the yardstick the delivery is judged against",
+      "properties": {
+        "objective": {
+          "type": "string",
+          "description": "The decision this analysis must inform"
+        },
+        "user_authority": {
+          "type": "string",
+          "enum": [
+            "can_act",
+            "can_influence",
+            "can_only_monitor",
+            "unknown"
+          ],
+          "description": "What the reader can actually do — action cards must not exceed this"
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date",
+          "description": "Knowledge cutoff for the whole analysis"
+        },
+        "budget": {
+          "type": "string",
+          "description": "Research budget (researcher count / calls / wall-clock)"
+        },
+        "stopping_rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Written BEFORE the run: core mechanisms covered / remaining gaps don't change the action / retrieval only returns same-family material / budget exhausted"
+        },
+        "completion_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "metadata": {
       "type": "object",
-      "required": ["system_name", "system_type", "analysis_date", "analyst_confidence", "information_sources"],
+      "required": [
+        "system_name",
+        "system_type",
+        "analysis_date",
+        "analyst_confidence",
+        "information_sources"
+      ],
       "properties": {
-        "system_name": { "type": "string", "description": "Full name of the system analyzed" },
+        "system_name": {
+          "type": "string",
+          "description": "Full name of the system analyzed"
+        },
         "system_type": {
           "type": "string",
-          "enum": ["geopolitical", "government_agency", "public_company", "private_company", "market", "platform", "dao", "relational", "other"]
+          "enum": [
+            "geopolitical",
+            "government_agency",
+            "public_company",
+            "private_company",
+            "market",
+            "platform",
+            "dao",
+            "relational",
+            "other"
+          ]
         },
-        "analysis_date": { "type": "string", "format": "date" },
-        "presenting_symptom": { "type": "string", "description": "Why was this analysis triggered?" },
+        "analysis_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "presenting_symptom": {
+          "type": "string",
+          "description": "Why was this analysis triggered?"
+        },
         "analyst_confidence": {
           "type": "string",
-          "enum": ["high", "medium", "low"],
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
           "description": "Overall confidence in the analysis given available information"
         },
         "information_sources": {
@@ -27,20 +116,35 @@
           "items": {
             "type": "object",
             "properties": {
-              "source": { "type": "string" },
-              "tier": { "type": "integer", "minimum": 1, "maximum": 4 },
-              "recency": { "type": "string", "enum": ["current", "recent_12mo", "historical"] }
+              "source": {
+                "type": "string"
+              },
+              "tier": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "description": "T1/T2/T3 only — unified with researcher-base.md and ach_score.py. Tier describes the source's material type, NOT the truth of any claim it carries."
+              },
+              "recency": {
+                "type": "string",
+                "enum": [
+                  "current",
+                  "recent_12mo",
+                  "historical"
+                ]
+              }
             }
           }
         },
         "information_gaps": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Key information that couldn't be obtained and limits confidence"
         }
       }
     },
-
     "cartography": {
       "type": "object",
       "description": "Structural map of the system before diagnosis",
@@ -50,109 +154,416 @@
           "items": {
             "type": "object",
             "properties": {
-              "name": { "type": "string" },
-              "role": { "type": "string" },
-              "stated_objective": { "type": "string" },
-              "revealed_preference": { "type": "string" },
-              "alignment_gap": { "type": "string", "enum": ["none", "minor", "significant", "severe"] }
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "stated_objective": {
+                "type": "string"
+              },
+              "revealed_preference": {
+                "type": "string"
+              },
+              "alignment_gap": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "minor",
+                  "significant",
+                  "severe"
+                ]
+              }
             }
           }
         },
-        "formal_rules": { "type": "array", "items": { "type": "string" } },
-        "informal_rules": { "type": "array", "items": { "type": "string" } },
-        "key_resource_flows": { "type": "array", "items": { "type": "string" } },
+        "formal_rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "informal_rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "key_resource_flows": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "system_phase": {
           "type": "string",
-          "enum": ["formation", "growth", "maturity", "decline", "crisis", "transformation", "unknown"]
+          "enum": [
+            "formation",
+            "growth",
+            "maturity",
+            "decline",
+            "crisis",
+            "transformation",
+            "unknown"
+          ]
         },
-        "critical_path_dependencies": { "type": "array", "items": { "type": "string" } }
-      }
-    },
-
-    "dimensions": {
-      "type": "object",
-      "description": "Seven-dimensional diagnostic scores and findings",
-      "required": ["d1_boundary", "d2_incentive", "d3_information", "d4_temporal", "d5_legitimacy", "d6_coupling", "d7_power"],
-      "properties": {
-
-        "d1_boundary": {
-          "$ref": "#/definitions/dimension",
-          "properties": {
-            "hard_constraints": { "type": "array", "items": { "type": "string" } },
-            "soft_constraint_health": { "type": "string", "enum": ["strong", "degrading", "collapsed"] },
-            "transaction_cost_trend": { "type": "string", "enum": ["decreasing", "stable", "increasing", "non_linear"] },
-            "pathology_patterns": { "type": "array", "items": { "type": "string" } }
-          }
-        },
-
-        "d2_incentive": {
-          "$ref": "#/definitions/dimension",
-          "properties": {
-            "incentive_compatibility_gaps": { "type": "array", "items": { "type": "string" } },
-            "game_type": { "type": "string", "enum": ["positive_sum", "mixed_sum", "zero_sum", "tragedy_commons"] },
-            "principal_agent_layers": { "type": "integer" },
-            "pathology_patterns": { "type": "array", "items": { "type": "string" } }
-          }
-        },
-
-        "d3_information": {
-          "$ref": "#/definitions/dimension",
-          "properties": {
-            "signal_fidelity": { "type": "string", "enum": ["high", "moderate", "distorted", "fabricated"] },
-            "dangerous_feedback_loops": { "type": "array", "items": { "type": "string" } },
-            "broken_feedback_loops": { "type": "array", "items": { "type": "string" } },
-            "decision_latency": { "type": "string", "enum": ["fast", "adequate", "slow", "gridlocked"] },
-            "pathology_patterns": { "type": "array", "items": { "type": "string" } }
-          }
-        },
-
-        "d4_temporal": {
-          "$ref": "#/definitions/dimension",
-          "properties": {
-            "entropy_balance": { "type": "string", "enum": ["net_negentropy", "balanced", "net_entropy", "consuming_seed_corn"] },
-            "game_philosophy": { "type": "string", "enum": ["infinite", "mixed", "finite", "terminal"] },
-            "optionality_level": { "type": "string", "enum": ["high", "moderate", "low", "locked_in"] },
-            "antifragility": { "type": "string", "enum": ["antifragile", "resilient", "fragile"] },
-            "pathology_patterns": { "type": "array", "items": { "type": "string" } }
-          }
-        },
-
-        "d5_legitimacy": {
-          "$ref": "#/definitions/dimension",
-          "properties": {
-            "narrative_reality_gap": { "type": "string", "enum": ["minimal", "moderate", "significant", "inverted"] },
-            "internal_cynicism_level": { "type": "string", "enum": ["low", "moderate", "high", "epidemic"] },
-            "external_legitimacy_trend": { "type": "string", "enum": ["growing", "stable", "eroding", "collapsed"] },
-            "identity_coherence": { "type": "string", "enum": ["strong", "intact", "strained", "fragmented"] },
-            "pathology_patterns": { "type": "array", "items": { "type": "string" } }
-          }
-        },
-
-        "d6_coupling": {
-          "$ref": "#/definitions/dimension",
-          "properties": {
-            "internal_coupling": { "type": "string", "enum": ["appropriately_loose", "appropriately_tight", "over_tight", "under_tight"] },
-            "critical_single_points_of_failure": { "type": "array", "items": { "type": "string" } },
-            "buffer_adequacy": { "type": "string", "enum": ["strong", "adequate", "thin", "none"] },
-            "cascade_risk": { "type": "string", "enum": ["low", "moderate", "high", "inevitable"] },
-            "pathology_patterns": { "type": "array", "items": { "type": "string" } }
-          }
-        },
-
-        "d7_power": {
-          "$ref": "#/definitions/dimension",
-          "properties": {
-            "formal_informal_gap": { "type": "string", "enum": ["minimal", "noticeable", "significant", "severe"], "description": "Gap between org chart and actual decision-making paths" },
-            "power_distribution": { "type": "string", "enum": ["distributed", "moderate_concentration", "high_concentration", "extreme_concentration_or_fragmentation"] },
-            "transition_readiness": { "type": "string", "enum": ["institutionalized", "planned", "uncertain", "crisis_prone"] },
-            "veto_node_health": { "type": "string", "enum": ["constructive", "mixed", "obstructive", "sclerotic"] },
-            "power_accountability_symmetry": { "type": "string", "enum": ["symmetric", "moderate_gap", "significant_gap", "inverted"] },
-            "pathology_patterns": { "type": "array", "items": { "type": "string" } }
+        "critical_path_dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
           }
         }
       }
     },
-
+    "dimensions": {
+      "type": "object",
+      "description": "Seven-dimensional diagnostic scores and findings",
+      "required": [
+        "d1_boundary",
+        "d2_incentive",
+        "d3_information",
+        "d4_temporal",
+        "d5_legitimacy",
+        "d6_coupling",
+        "d7_power"
+      ],
+      "properties": {
+        "d1_boundary": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/dimension"
+            }
+          ],
+          "type": "object",
+          "properties": {
+            "hard_constraints": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "soft_constraint_health": {
+              "type": "string",
+              "enum": [
+                "strong",
+                "degrading",
+                "collapsed"
+              ]
+            },
+            "transaction_cost_trend": {
+              "type": "string",
+              "enum": [
+                "decreasing",
+                "stable",
+                "increasing",
+                "non_linear"
+              ]
+            },
+            "pathology_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "d2_incentive": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/dimension"
+            }
+          ],
+          "type": "object",
+          "properties": {
+            "incentive_compatibility_gaps": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "game_type": {
+              "type": "string",
+              "enum": [
+                "positive_sum",
+                "mixed_sum",
+                "zero_sum",
+                "tragedy_commons"
+              ]
+            },
+            "principal_agent_layers": {
+              "type": "integer"
+            },
+            "pathology_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "d3_information": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/dimension"
+            }
+          ],
+          "type": "object",
+          "properties": {
+            "signal_fidelity": {
+              "type": "string",
+              "enum": [
+                "high",
+                "moderate",
+                "distorted",
+                "fabricated"
+              ]
+            },
+            "dangerous_feedback_loops": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "broken_feedback_loops": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision_latency": {
+              "type": "string",
+              "enum": [
+                "fast",
+                "adequate",
+                "slow",
+                "gridlocked"
+              ]
+            },
+            "pathology_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "d4_temporal": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/dimension"
+            }
+          ],
+          "type": "object",
+          "properties": {
+            "entropy_balance": {
+              "type": "string",
+              "enum": [
+                "net_negentropy",
+                "balanced",
+                "net_entropy",
+                "consuming_seed_corn"
+              ]
+            },
+            "game_philosophy": {
+              "type": "string",
+              "enum": [
+                "infinite",
+                "mixed",
+                "finite",
+                "terminal"
+              ]
+            },
+            "optionality_level": {
+              "type": "string",
+              "enum": [
+                "high",
+                "moderate",
+                "low",
+                "locked_in"
+              ]
+            },
+            "antifragility": {
+              "type": "string",
+              "enum": [
+                "antifragile",
+                "resilient",
+                "fragile"
+              ]
+            },
+            "pathology_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "d5_legitimacy": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/dimension"
+            }
+          ],
+          "type": "object",
+          "properties": {
+            "narrative_reality_gap": {
+              "type": "string",
+              "enum": [
+                "minimal",
+                "moderate",
+                "significant",
+                "inverted"
+              ]
+            },
+            "internal_cynicism_level": {
+              "type": "string",
+              "enum": [
+                "low",
+                "moderate",
+                "high",
+                "epidemic"
+              ]
+            },
+            "external_legitimacy_trend": {
+              "type": "string",
+              "enum": [
+                "growing",
+                "stable",
+                "eroding",
+                "collapsed"
+              ]
+            },
+            "identity_coherence": {
+              "type": "string",
+              "enum": [
+                "strong",
+                "intact",
+                "strained",
+                "fragmented"
+              ]
+            },
+            "pathology_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "d6_coupling": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/dimension"
+            }
+          ],
+          "type": "object",
+          "properties": {
+            "internal_coupling": {
+              "type": "string",
+              "enum": [
+                "appropriately_loose",
+                "appropriately_tight",
+                "over_tight",
+                "under_tight"
+              ]
+            },
+            "critical_single_points_of_failure": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "buffer_adequacy": {
+              "type": "string",
+              "enum": [
+                "strong",
+                "adequate",
+                "thin",
+                "none"
+              ]
+            },
+            "cascade_risk": {
+              "type": "string",
+              "enum": [
+                "low",
+                "moderate",
+                "high",
+                "inevitable"
+              ]
+            },
+            "pathology_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "d7_power": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/dimension"
+            }
+          ],
+          "type": "object",
+          "properties": {
+            "formal_informal_gap": {
+              "type": "string",
+              "enum": [
+                "minimal",
+                "noticeable",
+                "significant",
+                "severe"
+              ],
+              "description": "Gap between org chart and actual decision-making paths"
+            },
+            "power_distribution": {
+              "type": "string",
+              "enum": [
+                "distributed",
+                "moderate_concentration",
+                "high_concentration",
+                "extreme_concentration_or_fragmentation"
+              ]
+            },
+            "transition_readiness": {
+              "type": "string",
+              "enum": [
+                "institutionalized",
+                "planned",
+                "uncertain",
+                "crisis_prone"
+              ]
+            },
+            "veto_node_health": {
+              "type": "string",
+              "enum": [
+                "constructive",
+                "mixed",
+                "obstructive",
+                "sclerotic"
+              ]
+            },
+            "power_accountability_symmetry": {
+              "type": "string",
+              "enum": [
+                "symmetric",
+                "moderate_gap",
+                "significant_gap",
+                "inverted"
+              ]
+            },
+            "pathology_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "ach": {
       "type": "object",
       "description": "Analysis of Competing Hypotheses — alternative explanations tested against evidence",
@@ -161,14 +572,40 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["id", "statement", "status"],
+            "required": [
+              "id",
+              "statement",
+              "status"
+            ],
             "properties": {
-              "id": { "type": "string", "description": "H1, H2, etc." },
-              "statement": { "type": "string" },
-              "elaboration": { "type": "string" },
-              "status": { "type": "string", "enum": ["active", "stressed", "eliminated"] },
-              "inconsistent_evidence_count": { "type": "integer" },
-              "elimination_evidence": { "type": "string", "description": "Which evidence eliminated this hypothesis (if eliminated)" }
+              "id": {
+                "type": "string",
+                "description": "H1, H2, etc."
+              },
+              "statement": {
+                "type": "string"
+              },
+              "elaboration": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "stressed",
+                  "eliminated",
+                  "untestable"
+                ],
+                "description": "eliminated = conditionally refuted under the listed evidence and the current C/I/N coding — NOT proven false. 'not yet excluded' must never be rewritten as 'established', and ACH scores are not posterior probabilities."
+              },
+              "independent_family_count": {
+                "type": "integer",
+                "description": "Independent source families, not raw evidence rows — reprints count once"
+              },
+              "elimination_evidence": {
+                "type": "string",
+                "description": "Which evidence conditionally refuted this hypothesis (if eliminated)"
+              }
             }
           }
         },
@@ -177,18 +614,58 @@
           "items": {
             "type": "object",
             "properties": {
-              "evidence": { "type": "string" },
+              "evidence": {
+                "type": "string"
+              },
+              "tier": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "source_family": {
+                "type": "string",
+                "description": "Reprints/translations of one original share this id and are collapsed to a single weight"
+              },
               "ratings": {
                 "type": "object",
-                "additionalProperties": { "type": "string", "enum": ["C", "I", "N"] },
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "C",
+                    "I",
+                    "N"
+                  ]
+                },
                 "description": "Hypothesis ID → C/I/N rating"
               }
+            }
+          }
+        },
+        "sensitivity": {
+          "type": "object",
+          "description": "Which conclusions survive perturbation — drop the heaviest evidence family, collapse same-family reprints, flip a contested C/I/N coding",
+          "properties": {
+            "robust": {
+              "type": "boolean"
+            },
+            "decisive_evidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "verdict": {
+              "type": "string",
+              "enum": [
+                "robust",
+                "depends_on_key_assumption",
+                "evidence_cannot_discriminate"
+              ]
             }
           }
         }
       }
     },
-
     "cross_dimensional": {
       "type": "object",
       "properties": {
@@ -197,10 +674,26 @@
           "items": {
             "type": "object",
             "properties": {
-              "name": { "type": "string" },
-              "dimensions_involved": { "type": "array", "items": { "type": "string" } },
-              "mechanism": { "type": "string" },
-              "severity": { "type": "string", "enum": ["developing", "established", "accelerating"] }
+              "name": {
+                "type": "string"
+              },
+              "dimensions_involved": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "mechanism": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "developing",
+                  "established",
+                  "accelerating"
+                ]
+              }
             }
           }
         },
@@ -209,198 +702,1098 @@
           "items": {
             "type": "object",
             "properties": {
-              "name": { "type": "string" },
-              "dimensions_involved": { "type": "array", "items": { "type": "string" } },
-              "mechanism": { "type": "string" }
+              "name": {
+                "type": "string"
+              },
+              "dimensions_involved": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "mechanism": {
+                "type": "string"
+              }
             }
           }
         },
         "compensating_effects": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Where strength in one dimension offsets weakness in another"
         },
         "highest_leverage_points": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Meadows-style leverage points where small changes have large system effects"
         }
       }
     },
-
     "risk_nodes": {
       "type": "array",
       "description": "1-3 most critical failure points",
       "items": {
         "type": "object",
-        "required": ["name", "dimension_primary", "failure_cascade", "time_horizon", "trigger"],
+        "required": [
+          "name",
+          "dimension_primary",
+          "failure_cascade",
+          "time_horizon",
+          "trigger"
+        ],
         "properties": {
-          "name": { "type": "string", "description": "Precise name — specific enough to act on" },
-          "dimension_primary": { "type": "string" },
-          "dimensions_secondary": { "type": "array", "items": { "type": "string" } },
+          "name": {
+            "type": "string",
+            "description": "Precise name — specific enough to act on"
+          },
+          "dimension_primary": {
+            "type": "string"
+          },
+          "dimensions_secondary": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "failure_cascade": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "Ordered sequence of events if this node fails"
           },
-          "time_horizon": { "type": "string", "enum": ["immediate_0-3mo", "near_term_3-12mo", "medium_term_1-3yr", "long_term_3yr+"] },
-          "trigger": { "type": "string", "description": "What event/condition could precipitate failure" },
-          "severity": { "type": "string", "enum": ["existential", "severe", "significant", "moderate"] }
+          "time_horizon": {
+            "type": "string",
+            "enum": [
+              "immediate_0-3mo",
+              "near_term_3-12mo",
+              "medium_term_1-3yr",
+              "long_term_3yr+"
+            ]
+          },
+          "trigger": {
+            "type": "string",
+            "description": "What event/condition could precipitate failure"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "existential",
+              "severe",
+              "significant",
+              "moderate"
+            ]
+          }
         }
       }
     },
-
     "overall_health": {
       "type": "object",
       "properties": {
-        "composite_score": { "type": "number", "minimum": 1, "maximum": 5 },
-        "trajectory": { "type": "string", "enum": ["improving", "stable", "deteriorating", "accelerating_decline"] },
+        "composite_score": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "trajectory": {
+          "type": "string",
+          "enum": [
+            "improving",
+            "stable",
+            "deteriorating",
+            "accelerating_decline"
+          ]
+        },
         "system_archetype": {
           "type": "string",
           "description": "One-phrase characterization: 'mature institution in slow decay', 'growth-stage entity hitting scaling limits', etc."
         }
       }
     },
-
-    "scenarios": {
-      "type": "array",
-      "description": "Natural evolution paths if no significant intervention",
-      "items": {
-        "type": "object",
-        "required": ["name", "type", "probability", "description", "key_conditions"],
-        "properties": {
-          "name": { "type": "string" },
-          "type": { "type": "string", "enum": ["heat_death", "violent_bifurcation", "phase_transition", "recovery", "other"] },
-          "probability": { "type": "number", "minimum": 0, "maximum": 1 },
-          "time_horizon": { "type": "string" },
-          "description": { "type": "string" },
-          "key_conditions": { "type": "array", "items": { "type": "string" } },
-          "early_warning_signals": { "type": "array", "items": { "type": "string" } }
+    "scenario_set": {
+      "type": "object",
+      "description": "Conditional scenarios built from the specific uncertainties of THIS system. There is no default three-way split, and probabilities are optional.",
+      "properties": {
+        "is_probability_distribution": {
+          "type": "boolean",
+          "description": "True only when the scenarios are mutually exclusive and exhaustive over the same horizon AND a defensible probability basis exists. Only then may probabilities sum to 1."
+        },
+        "driving_uncertainties": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The external shocks, internal mechanisms and available actions the scenarios are constructed from"
+        },
+        "shared_horizon": {
+          "type": "string"
         }
       }
     },
-
+    "scenarios": {
+      "type": "array",
+      "description": "Conditional evolution paths. NOT a fixed heat-death/bifurcation/emergence triad — those are discussion metaphors, not an exhaustive event set for every system.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "key_conditions"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "Free-form label for this scenario's mechanism; no fixed taxonomy"
+          },
+          "probability": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omit or null when no defensible basis exists — 'cannot give a probability' is a legitimate output"
+          },
+          "probability_basis": {
+            "type": "string",
+            "description": "Required whenever probability is non-null: what the number is derived from (base rate, model, expert range). No basis → no number."
+          },
+          "time_horizon": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "key_conditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "robust_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Actions that remain defensible under this scenario — preferred output over forced probabilities under deep uncertainty"
+          },
+          "early_warning_signals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
     "prescriptions": {
       "type": "array",
       "description": "3-5 high-leverage interventions",
       "items": {
         "type": "object",
-        "required": ["title", "target_dimension", "mechanism", "resistance", "second_order_effects"],
+        "required": [
+          "title",
+          "target_dimension",
+          "mechanism",
+          "resistance",
+          "second_order_effects"
+        ],
         "properties": {
-          "title": { "type": "string" },
-          "target_dimension": { "type": "string" },
-          "target_pathology": { "type": "string" },
-          "mechanism": { "type": "string", "description": "Why this works, not just what to do" },
+          "title": {
+            "type": "string"
+          },
+          "target_dimension": {
+            "type": "string"
+          },
+          "target_pathology": {
+            "type": "string"
+          },
+          "mechanism": {
+            "type": "string",
+            "description": "Why this works, not just what to do"
+          },
           "specific_actions": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "Concrete enough to execute on Monday morning"
           },
-          "resistance": { "type": "string", "description": "Who will oppose this and why" },
-          "second_order_effects": { "type": "array", "items": { "type": "string" } },
-          "positive_spillover": { "type": "array", "items": { "type": "string" }, "description": "Other dimensions incidentally improved, with mechanism" },
-          "negative_spillover": { "type": "array", "items": { "type": "string" }, "description": "Dimensions potentially worsened, with mechanism" },
-          "conflicts_with": { "type": "array", "items": { "type": "string" }, "description": "Other prescription titles this one contradicts" },
-          "impact": { "type": "string", "enum": ["transformative", "high", "medium", "low"] },
-          "feasibility": { "type": "string", "enum": ["high", "medium", "low", "requires_external_shock"] },
-          "urgency": { "type": "string", "enum": ["immediate", "near_term", "medium_term"] }
+          "resistance": {
+            "type": "string",
+            "description": "Who will oppose this and why"
+          },
+          "second_order_effects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "positive_spillover": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Other dimensions incidentally improved, with mechanism"
+          },
+          "negative_spillover": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Dimensions potentially worsened, with mechanism"
+          },
+          "conflicts_with": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Other prescription titles this one contradicts"
+          },
+          "impact": {
+            "type": "string",
+            "enum": [
+              "transformative",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "feasibility": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "requires_external_shock"
+            ]
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "immediate",
+              "near_term",
+              "medium_term"
+            ]
+          }
         }
       }
     },
-
     "monitoring_dashboard": {
       "type": "array",
       "description": "Leading indicators for ongoing health tracking",
       "items": {
         "type": "object",
-        "required": ["indicator", "dimension", "how_to_measure", "danger_threshold", "health_threshold"],
+        "required": [
+          "indicator",
+          "dimension",
+          "how_to_measure",
+          "danger_threshold",
+          "health_threshold"
+        ],
         "properties": {
-          "indicator": { "type": "string" },
-          "dimension": { "type": "string" },
-          "how_to_measure": { "type": "string" },
-          "measurement_frequency": { "type": "string" },
-          "danger_threshold": { "type": "string" },
-          "health_threshold": { "type": "string" },
-          "leading_or_lagging": { "type": "string", "enum": ["leading", "coincident", "lagging"] }
+          "indicator": {
+            "type": "string"
+          },
+          "dimension": {
+            "type": "string"
+          },
+          "how_to_measure": {
+            "type": "string"
+          },
+          "measurement_frequency": {
+            "type": "string"
+          },
+          "danger_threshold": {
+            "type": "string"
+          },
+          "health_threshold": {
+            "type": "string"
+          },
+          "leading_or_lagging": {
+            "type": "string",
+            "enum": [
+              "leading",
+              "coincident",
+              "lagging"
+            ]
+          }
         }
       }
     },
-
     "predictions": {
       "type": "array",
-      "description": "3-5 falsifiable predictions derived from the diagnosis",
+      "description": "Falsifiable predictions derived from the diagnosis. Probabilities express judgement — there is NO required mix of high- and low-confidence entries.",
       "items": {
         "type": "object",
-        "required": ["prediction", "falsification_condition", "time_horizon", "confidence", "dimension_link", "source_step"],
+        "required": [
+          "prediction",
+          "falsification_condition",
+          "time_horizon",
+          "confidence",
+          "dimension_link",
+          "source_step",
+          "event_type"
+        ],
         "properties": {
-          "prediction": { "type": "string" },
-          "falsification_condition": { "type": "string" },
-          "time_horizon": { "type": "string", "format": "date" },
-          "trigger_indicator": { "type": "string" },
-          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
-          "dimension_link": { "type": "string", "pattern": "^D[1-7]$" },
-          "conditional_update": { "type": "string" },
-          "source_step": { "type": "string", "enum": ["dimension_analysis", "cross_dimensional"] }
+          "prediction": {
+            "type": "string"
+          },
+          "falsification_condition": {
+            "type": "string"
+          },
+          "time_horizon": {
+            "type": "string",
+            "format": "date"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "occurrence",
+              "persistence",
+              "point_in_time",
+              "conditional"
+            ],
+            "description": "Determines which early adjudications are legitimate. occurrence = happens at least once before the deadline; persistence = holds until the deadline; point_in_time = the state/value at the deadline; conditional = adjudicated only after the trigger fires."
+          },
+          "adjudication_window": {
+            "type": "string",
+            "description": "When the prediction may be judged, and in which timezone"
+          },
+          "adjudication_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Priority order of sources used to adjudicate, plus how missing data is handled — frozen at registration"
+          },
+          "trigger_condition": {
+            "type": "string",
+            "description": "For conditional predictions: what must happen before adjudication starts"
+          },
+          "trigger_indicator": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "dimension_link": {
+            "type": "string",
+            "pattern": "^D[1-7]$"
+          },
+          "mechanism_id": {
+            "type": "string",
+            "description": "The mechanism card this prediction is derived from"
+          },
+          "frozen_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Registration timestamp; updates create a NEW version rather than overwriting"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "supersedes_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "conditional_update": {
+            "type": "string"
+          },
+          "source_step": {
+            "type": "string",
+            "enum": [
+              "dimension_analysis",
+              "cross_dimensional"
+            ]
+          }
         }
       }
     },
-
     "candidate_predictions": {
       "type": "array",
       "description": "Predictions considered but not selected for the final set",
-      "items": { "$ref": "#/properties/predictions/items" }
+      "items": {
+        "$ref": "#/properties/predictions/items"
+      }
     },
-
+    "claims": {
+      "type": "array",
+      "description": "Assertion-level evidence ledger. The audit chain is source → claim → mechanism → judgment → forecast/action; every object below has a stable id and typed relations.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "statement",
+          "status",
+          "sources"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^C[0-9]+$"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "supported",
+              "contradicted",
+              "unresolved"
+            ],
+            "description": "supported = supported BY THE LISTED MATERIAL under the stated definitions; not a claim of permanent truth"
+          },
+          "status_checked_at": {
+            "type": "string",
+            "format": "date"
+          },
+          "loads": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Ids of dimensions / mechanisms / risk nodes / predictions / actions that depend on this claim"
+          },
+          "event_time": {
+            "type": "string",
+            "description": "When the described event happened (empty if unknown — never substitute the retrieval date)"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "url",
+                "role"
+              ],
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "tier": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3
+                },
+                "source_family": {
+                  "type": "string",
+                  "description": "Original-origin family id; reprints, translations and quotations of one original share it and count once"
+                },
+                "lineage": {
+                  "type": "string",
+                  "enum": [
+                    "original",
+                    "reprint",
+                    "translation",
+                    "quotation",
+                    "aggregation",
+                    "unknown"
+                  ]
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "supports",
+                    "contradicts",
+                    "background"
+                  ]
+                },
+                "directness": {
+                  "type": "string",
+                  "enum": [
+                    "direct",
+                    "indirect",
+                    "inferred"
+                  ],
+                  "description": "How directly this material bears on THIS claim — an official document proves 'the rule was published', not 'the rule worked'"
+                },
+                "interest": {
+                  "type": "string",
+                  "description": "Interest the publisher/observer has in the claim being true"
+                },
+                "excerpt": {
+                  "type": "string"
+                },
+                "locator": {
+                  "type": "string",
+                  "description": "Page / paragraph / timestamp of the excerpt"
+                },
+                "published_at": {
+                  "type": "string"
+                },
+                "retrieved_at": {
+                  "type": "string"
+                },
+                "reachability": {
+                  "type": "string",
+                  "enum": [
+                    "reachable",
+                    "unavailable",
+                    "unchecked"
+                  ],
+                  "description": "Reachability is NOT verification status — keep them separate"
+                }
+              }
+            }
+          },
+          "independent_check": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "confirmed",
+                  "contradicted",
+                  "unresolved",
+                  "not_run"
+                ]
+              },
+              "note": {
+                "type": "string"
+              },
+              "faithfulness_checked": {
+                "type": "boolean",
+                "description": "Whether the paraphrase was checked back against the original sentence for subject/source/direction reversal"
+              }
+            }
+          },
+          "needs_review": {
+            "type": "boolean",
+            "description": "Set on dependents when a load-bearing claim is contradicted or withdrawn"
+          },
+          "claim_type": {
+            "type": "string",
+            "enum": [
+              "officeholder",
+              "crisis_status",
+              "operational_status",
+              "market_price",
+              "policy_in_force",
+              "financial_period",
+              "statistical_series",
+              "charter_rule",
+              "structural_fact",
+              "historical_fact"
+            ],
+            "description": "Determines how fast this claim goes stale. There is no single threshold that fits all material: an officeholder claim is stale in a week, a charter rule in two years, a historical fact never."
+          },
+          "valid_from": {
+            "type": "string",
+            "description": "When the described state started holding"
+          },
+          "valid_to": {
+            "type": "string",
+            "description": "When it stopped holding (empty = still holds as of `as_of`)"
+          }
+        }
+      }
+    },
+    "mechanisms": {
+      "type": "array",
+      "description": "Mechanism cards — the minimum analytical unit. A mechanism explains an observation via actors, rules and intermediate steps, and must name what would take it down.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "explains",
+          "chain",
+          "alternatives",
+          "failure_conditions"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^M[0-9]+$"
+          },
+          "explains": {
+            "type": "string",
+            "description": "Phenomenon, object, time window and comparison baseline"
+          },
+          "chain": {
+            "type": "string",
+            "description": "Which actors, under which rules and constraints, do what, through which intermediate process, producing which outcome"
+          },
+          "variables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "A concrete variable — 'incident reporting delay', 'cash buffer' — not 'D3'"
+                },
+                "unit_or_proxy": {
+                  "type": "string"
+                },
+                "how_obtained": {
+                  "type": "string"
+                },
+                "missing": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "supporting_claims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contradicting_claims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "alternatives": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "At least one alternative explanation leading to a different observation or action; if none is plausible, describe the search that established that"
+          },
+          "discriminating_predictions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What we should additionally see if THIS mechanism holds rather than the alternatives"
+          },
+          "failure_conditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "action_impact": {
+            "type": "string",
+            "description": "Which choice it changes; if it changes none, state its explanatory value instead"
+          },
+          "causal_level": {
+            "type": "string",
+            "enum": [
+              "L1_explanatory",
+              "L2_parameterised",
+              "L3_effect_estimate"
+            ],
+            "description": "L1 gives conditional direction only. L2 requires units/data/defensible expert ranges plus sensitivity checks. L3 requires an estimand and a defensible identification strategy. Never emit L3-style effect promises from L1 arrows or ordinal scores."
+          },
+          "dimension_link": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^D[1-7]$"
+            },
+            "description": "Seven dimensions serve as navigation/retrieval labels for this mechanism, not as the mechanism itself"
+          }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "description": "Action cards — an action must be executable by a named role, verifiable, and bounded by guardrails.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "action",
+          "mechanism_id",
+          "executor_role",
+          "first_step",
+          "verification",
+          "guardrails"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^A[0-9]+$"
+          },
+          "action": {
+            "type": "string"
+          },
+          "mechanism_id": {
+            "type": "string"
+          },
+          "executor_role": {
+            "type": "string",
+            "enum": [
+              "user_direct",
+              "user_influence",
+              "user_monitor_only",
+              "third_party"
+            ]
+          },
+          "authority_required": {
+            "type": "string"
+          },
+          "first_step": {
+            "type": "string",
+            "description": "First deliverable move, its preconditions and definition of done"
+          },
+          "resources_and_lead_time": {
+            "type": "string"
+          },
+          "alternatives": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Hold / gather more evidence / run a trial / intervene — with the trade-off"
+          },
+          "beneficiaries_and_losers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verification": {
+            "type": "object",
+            "properties": {
+              "baseline": {
+                "type": "string"
+              },
+              "outcome_metric": {
+                "type": "string",
+                "description": "Prefer an independent outcome metric over the metric the action itself targets"
+              },
+              "comparison": {
+                "type": "string"
+              },
+              "observation_window": {
+                "type": "string"
+              }
+            }
+          },
+          "guardrails": {
+            "type": "object",
+            "properties": {
+              "side_effect_metrics": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "stop_conditions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "rollback": {
+                "type": "string"
+              }
+            }
+          },
+          "decision_triggers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What new evidence starts, defers, escalates or cancels it"
+          },
+          "blocked_by_claims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Unresolved high-stakes claims that make this action non-recommendable for now"
+          }
+        }
+      }
+    },
+    "coverage_audit": {
+      "type": "array",
+      "description": "Element-group coverage audit. This is an audit table, not a fixed twelve-chapter outline — unknowns that materially affect the current decision get priority; low-relevance items need no expansion.",
+      "items": {
+        "type": "object",
+        "required": [
+          "element_group",
+          "status"
+        ],
+        "properties": {
+          "element_group": {
+            "type": "string",
+            "enum": [
+              "goals_and_evaluators",
+              "boundary_and_environment",
+              "actors_and_capabilities",
+              "rules_and_metarules",
+              "resources_and_stocks",
+              "information_and_measurement",
+              "production_process",
+              "dependencies_and_substitutes",
+              "power_and_legitimacy",
+              "time_and_adaptation",
+              "distribution_and_externalities",
+              "analyst_and_reflexivity"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "covered",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "evidence_or_reason": {
+            "type": "string"
+          },
+          "affects_current_decision": {
+            "type": "boolean",
+            "description": "If true and status is unknown, it must surface in the summary or in an action's conditions"
+          }
+        }
+      }
+    },
+    "boundary_sensitivity": {
+      "type": "object",
+      "description": "Does the conclusion survive including/excluding one important actor?",
+      "properties": {
+        "actor_tested": {
+          "type": "string"
+        },
+        "conclusion_changes": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "judgement_changes": {
+      "type": "array",
+      "description": "On repeat analysis: what was added, withdrawn or retained, and why",
+      "items": {
+        "type": "object",
+        "properties": {
+          "object_id": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "added",
+              "withdrawn",
+              "revised",
+              "retained"
+            ]
+          },
+          "change_type": {
+            "type": "string",
+            "enum": [
+              "system_state",
+              "mechanism",
+              "measurement",
+              "analysis_correction"
+            ],
+            "description": "A measurement-basis change is NOT a system change — check comparability before reading it as improvement"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "historical_analogies": {
       "type": "array",
       "description": "Top-3 structurally similar historical cases by magnitude-aware 7-dim distance similarity",
       "items": {
         "type": "object",
-        "required": ["name", "similarity", "outcome", "key_lesson"],
+        "required": [
+          "name",
+          "similarity",
+          "outcome",
+          "key_lesson",
+          "match_type"
+        ],
         "properties": {
-          "name": { "type": "string" },
-          "system_type": { "type": "string" },
-          "time_snapshot": { "type": "string" },
-          "similarity": { "type": "number", "minimum": 0, "maximum": 1 },
-          "scores": { "type": "object", "additionalProperties": { "type": "integer" } },
-          "outcome": { "type": "string" },
-          "key_lesson": { "type": "string" },
-          "key_differences": { "type": "array", "items": { "type": "string" }, "description": "Where current system diverges from this analogy" }
+          "name": {
+            "type": "string"
+          },
+          "system_type": {
+            "type": "string"
+          },
+          "time_snapshot": {
+            "type": "string"
+          },
+          "similarity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "match_type": {
+            "type": "string",
+            "enum": [
+              "full",
+              "partial"
+            ],
+            "description": "partial = fewer than 6 scored dimensions; must be presented as insufficient coverage, never as a structural match"
+          },
+          "coverage": {
+            "type": "string",
+            "description": "e.g. \"7/7\" — how many dimensions the similarity was computed over"
+          },
+          "outcome_is_hindsight": {
+            "type": "boolean",
+            "description": "Case scores were coded with the outcome already known. Analogies generate leads to test; they do not produce probabilities of occurrence."
+          },
+          "scores": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "key_lesson": {
+            "type": "string"
+          },
+          "key_differences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Where current system diverges from this analogy"
+          }
         }
       }
+    },
+    "dimension_basis_version": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Per-dimension scoring-basis version, e.g. {\"D3\": \"v2\"}. When it changes, historical scores for that dimension are NOT directly comparable — a metric redefinition is not a system change."
+    },
+    "measurement_changes": {
+      "type": "array",
+      "description": "Registered changes to how something is measured, so cross-period comparison can refuse to read them as system change",
+      "items": {
+        "type": "object",
+        "required": [
+          "metric",
+          "change"
+        ],
+        "properties": {
+          "metric": {
+            "type": "string"
+          },
+          "dimension": {
+            "type": "string",
+            "pattern": "^D[1-7]$"
+          },
+          "change": {
+            "type": "string"
+          },
+          "effective": {
+            "type": "string"
+          },
+          "comparable_before_after": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "analysis_id": {
+      "type": "string",
+      "description": "Immutable version id, e.g. \"20260908-002\". Saving twice in one day yields two versions; neither overwrites the other."
+    },
+    "supersedes": {
+      "type": "string",
+      "description": "analysis_id of the version this one follows"
     }
-
   },
-
   "definitions": {
     "dimension": {
       "type": "object",
-      "required": ["score", "trajectory", "key_findings", "evidence"],
+      "required": [
+        "score",
+        "trajectory",
+        "key_findings",
+        "evidence"
+      ],
       "properties": {
         "score": {
-          "type": "number",
-          "minimum": 1,
-          "maximum": 5,
-          "description": "Health score calibrated against scoring-calibration.md anchor cases"
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
+            {
+              "type": "string",
+              "enum": [
+                "unknown",
+                "not_applicable"
+              ]
+            }
+          ],
+          "description": "Health score calibrated against scoring-calibration.md anchor cases. Use \"unknown\" when evidence is missing and \"not_applicable\" when the dimension does not apply — never a mid-range number as a stand-in."
+        },
+        "score_basis_version": {
+          "type": "string",
+          "description": "Version of the scoring anchors/definition used. Changing it makes historical scores non-comparable."
+        },
+        "score_range": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Report a range instead of a point score when the score would differ materially across surviving hypotheses"
         },
         "trajectory": {
           "type": "string",
-          "enum": ["improving", "stable", "deteriorating"],
+          "enum": [
+            "improving",
+            "stable",
+            "deteriorating"
+          ],
           "description": "Direction of travel over last 12 months"
         },
         "key_findings": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "2-3 most important observations for this dimension"
         },
         "evidence": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Observable facts or data points supporting the score"
         },
         "confidence": {
           "type": "string",
-          "enum": ["high", "medium", "low"],
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
           "description": "Confidence in this dimension's score given available data"
         }
       }

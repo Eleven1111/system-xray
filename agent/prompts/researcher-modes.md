@@ -136,21 +136,32 @@ prediction: {
   "time_horizon": "2026-12-31",
   "trigger_indicator": "需监控的先行指标",
   "confidence": 0.7,
-  "dimension_link": "D2"
+  "dimension_link": "D2",
+  "event_type": "occurrence|persistence|point_in_time|conditional"
 }
 ```
 
-**⏳ 时序规则（关键，必须遵守）：** 一条"X 持续到 `time_horizon`"的预测，在 horizon 到期**之前不可能判 `confirmed`**——因为在那天之前条件随时还能破。到期前只有三种合法结论：
-- `falsified`：falsification_condition **已经**发生（提前证伪任何时候都合法）
-- `on_track`：当前证据与预测一致、但窗口未到，**不算证实**
-- `pending`：尚无决定性证据
-**只有当 today ≥ time_horizon 且条件成立**，才可判 `confirmed`。先比较 today 与 time_horizon，再决定能否用 confirmed。
+**⏳ 裁定规则由 `event_type` 决定（必须先看它，再决定能给什么结论）：**
+
+| `event_type` | 到期前可判 `confirmed` | 到期前可判 `falsified` |
+|---|---|---|
+| `occurrence`（截止日前至少发生一次） | **可以**——事件已被充分证据确认 | **不可以**；除非预先定义的不可能条件已被证实（一并填 `impossibility_established: true` 并给证据） |
+| `persistence`（持续到截止日） | 不可以——到期才能确认 | 可以——窗口内出现明确破坏 |
+| `point_in_time`（截止日的状态或数值） | 不可以 | 不可以——中途波动不构成否定 |
+| `conditional`（条件预测） | 先确认触发条件；未触发填 `trigger_occurred: false` 并判 `pending` | 同左 |
+
+`event_type` 缺失或看不出来 → **两个方向都不提前裁定**，判 `on_track` / `pending`，
+并在 `note` 里说明缺事件语义。
+
+到期前的三种合法结论：`falsified`（仅在上表允许时）/ `on_track`（一致但未到期，**不算证实**）/
+`pending`（尚无决定性证据）。
 
 **工作流程：**
-1. 用 WebSearch 搜索与 `falsification_condition` 和 `trigger_indicator` 相关的**最新**事件（含"今天/过去 48 小时"）
-2. 先看 `time_horizon` 是否已过：未过 → 最多 `on_track`/`falsified`/`pending`，**禁用 confirmed**
-3. 已被证伪 → 记录具体证伪事件和信源
-4. 评估当前证据对成立概率的影响方向（updated_probability）
+1. 读 `event_type`，对照上表确定本条允许哪些提前裁定
+2. 用 WebSearch 搜索与 `falsification_condition` 和 `trigger_indicator` 相关的**最新**事件（含"今天/过去 48 小时"）
+3. 比较 today 与 `time_horizon`，按第 1 步的结论决定可用的 verification_result
+4. 已被证伪 → 记录具体证伪事件和信源
+5. 评估当前证据对成立概率的影响方向（updated_probability）
 
 **输出 schema：**
 ```json
@@ -158,7 +169,10 @@ prediction: {
   "mode": "prediction_verification",
   "original_prediction": {"prediction": "...", "confidence": 0.7, "time_horizon": "YYYY-MM-DD"},
   "time_horizon": "YYYY-MM-DD",
+  "event_type": "occurrence|persistence|point_in_time|conditional（从输入复制；缺失写 null）",
   "verification_result": "falsified|on_track|pending|confirmed",
+  "impossibility_established": "仅 occurrence 型提前判 falsified 时为 true，并须在 evidence 中给出依据",
+  "trigger_occurred": "仅 conditional 型：触发条件是否已发生",
   "evidence": [{"title": "...", "url": "...", "excerpt": "...", "tier": 1, "date": "YYYY-MM-DD"}],
   "falsification_event": "具体证伪事件描述（仅 falsified 时填写）",
   "updated_probability": "当前证据下的修正概率（0.0-1.0）",
@@ -187,6 +201,15 @@ loads: ["D7", "risk_node:2"]        # 该断言支撑的诊断元素（仅供你
 2. 至少 2 条**独立**信源（不同机构、非同源转载），优先 T1/T2。注意发布日期——要最新的事实。
 3. 比对：检索得到的答案与 claim 一致 → `confirmed`；不一致 → `contradicted`（给出**正确答案** + 信源）；证据不足 → `unresolved`。
 4. 警惕单一 T3 源支撑 claim 而多个 T2 源指向不同答案的情形——这正是综述类错误的典型签名。
+5. **反证式检索（强制加一轮）**：除了查"正确答案是什么"，再显式搜一轮**与原断言相反**的表述。
+   查询里带上否定式与相反方向（如 `"X 不是 Y"`、`"Y 由谁接任"`、`"X 加盟自"`），
+   以及原断言若为假**应当留下什么痕迹**（更正启事、后续报道、官方名单）。
+   只检索支持性证据得到的 `confirmed` 不可信——它测的是检索词，不是事实。
+6. **改写忠实性 / 翻译方向核对**：断言来自改写或译文时，回到**原句**核对**主体、来源、方向**：
+   - "A 向 B 汇报" vs "B 来自 A"——谁是主语？
+   - "据报道将做 Y" vs "已做 Y"——是计划还是完成？
+   - 译文里的被动语态与所有格在中英转换时最容易反向，逐字对齐一次。
+   独立求证与原句核对**都做**：前者抓"记错了"，后者抓"读反了"，是两类不同的错。
 
 **输出 schema：**
 ```json
@@ -197,7 +220,9 @@ loads: ["D7", "risk_node:2"]        # 该断言支撑的诊断元素（仅供你
   "status": "confirmed|contradicted|unresolved",
   "correct_answer": "仅 contradicted 时填：检索得出的正确答案",
   "evidence": [{"title": "...", "url": "...", "excerpt": "...", "tier": 1, "date": "YYYY-MM-DD"}],
-  "independence_note": "所用信源是否相互独立/是否同源转载",
+  "independence_note": "所用信源是否相互独立/是否同源转载（列出各自的 source_family）",
+  "counter_search_note": "反证式检索用了哪些查询、找到了什么/没找到什么",
+  "faithfulness_checked": "是否回到原句核对过主体/来源/方向（true|false）",
   "confidence": "high|medium|low"
 }
 ```
