@@ -53,9 +53,10 @@ def blind_package(case_id: str, outputs: dict, seed: str | None = None) -> dict:
     """
     rng = random.Random(seed or hashlib.sha256(case_id.encode()).hexdigest())
     paths = sorted(outputs)
-    labels = [f'{case_id}-{c}' for c in 'ABC'[:len(paths)]] or []
-    if len(paths) > len(labels):
-        labels = [f'{case_id}-{i}' for i in range(len(paths))]
+    # 标签刻意不用 A/B/C：路径名就叫 A_current/B_generic/C_new，
+    # 同字母会诱使评审去做"标签 A = 路径 A"的映射猜测，而随机打乱迟早会撞上一次真对应。
+    # 试点时就撞上了（label-C → C_new），所以改用与路径名无字母交集的记号。
+    labels = [f'{case_id}-{c}' for c in 'PQRSTU'[:len(paths)]]
     rng.shuffle(paths)
 
     items, key = [], {}

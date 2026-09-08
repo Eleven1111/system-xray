@@ -35,6 +35,11 @@ BUDGET_TOLERANCE = 1.5
 
 BUDGET_KEYS = ('tool_calls', 'searches', 'wall_clock_seconds', 'tokens')
 
+# 篇幅差异容忍度。这不是预算，是**评审偏倚**：更长的报告天然显得更用心，
+# 而方案 §14.4 明确说"报告更长"不得作为成功指标。
+# 试点实测三条路径差到 3.3×——不提醒的话，盲评拿到的就是一场篇幅比赛。
+LENGTH_TOLERANCE = 2.0
+
 
 def case_dir(case_id: str) -> Path:
     return RUNS_DIR / case_id
@@ -142,7 +147,26 @@ def check_comparability(case_id: str, round_name: str) -> dict:
             if over:
                 problems.append(f'{key} 超出预登记上限 {cap[key]}：{over}')
 
-    return {'comparable': not problems, 'ratios': ratios, 'errors': problems}
+    # 篇幅偏倚：不阻断（篇幅差异本身可能就是方法差异的真实结果），但必须让评审组织者看见，
+    # 并在评分说明里明确要求评审不得以长度作为增量依据。
+    lengths, warnings = {}, []
+    for p in PATHS:
+        f = case_dir(case_id) / runs[p]['output_file']
+        lengths[p] = len(f.read_text(encoding='utf-8')) if f.exists() else 0
+    nonzero = [v for v in lengths.values() if v > 0]
+    if nonzero:
+        ratio = max(lengths.values()) / min(nonzero)
+        ratios['output_length'] = round(ratio, 3)
+        if ratio > LENGTH_TOLERANCE:
+            longest = max(lengths, key=lengths.get)
+            warnings.append(
+                f'篇幅最高/最低 = {ratio:.2f}×（>{LENGTH_TOLERANCE}），最长的是「{longest}」。'
+                f'不阻断，但评分说明里必须写明**不得以长度作为决策增量的依据**——'
+                f'否则盲评会退化成篇幅比赛'
+            )
+
+    return {'comparable': not problems, 'ratios': ratios,
+            'output_lengths': lengths, 'warnings': warnings, 'errors': problems}
 
 
 def package_for_review(case_id: str, round_name: str) -> dict:

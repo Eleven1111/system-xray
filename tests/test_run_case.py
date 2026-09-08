@@ -133,6 +133,34 @@ def test_package_separates_key_from_review_material():
     assert (run_case.case_dir('PILOT-00') / r['key_file']).exists()
 
 
+def test_length_disparity_is_flagged_but_not_blocking():
+    # 试点发现：篇幅差 3.28×。不阻断，但必须让评审组织者看见
+    _init()
+    for path, n in (('A_current', 1000), ('B_generic', 1000), ('C_new', 4000)):
+        run_case.record_run('PILOT-00', path, 'fixed_material', 'x' * n, _budget())
+    r = run_case.check_comparability('PILOT-00', 'fixed_material')
+    assert r['comparable'] is True                       # 篇幅不阻断
+    assert r['ratios']['output_length'] == 4.0
+    assert any('篇幅' in w and '不得以长度' in w for w in r['warnings'])
+
+
+def test_similar_lengths_produce_no_warning():
+    _init()
+    for path in run_case.PATHS:
+        run_case.record_run('PILOT-00', path, 'fixed_material', 'x' * 1000, _budget())
+    assert run_case.check_comparability('PILOT-00', 'fixed_material')['warnings'] == []
+
+
+def test_blind_labels_do_not_share_letters_with_path_names():
+    # 试点发现：标签 A/B/C 与路径名 A_current/B_generic/C_new 同字母，
+    # 打乱后可能真撞上，评审白捡身份信息
+    from evals.decision_increment import blind_package
+    pkg = blind_package('X1', {p: f'{p} 输出' for p in run_case.PATHS})
+    suffixes = {i['label'].rsplit('-', 1)[-1] for i in pkg['items']}
+    path_initials = {p[0] for p in run_case.PATHS}
+    assert not (suffixes & path_initials), f'标签字母与路径名首字母重叠：{suffixes & path_initials}'
+
+
 def test_rounds_are_recorded_separately():
     _init()
     _record_all(round_name='fixed_material')
