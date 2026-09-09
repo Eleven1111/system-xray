@@ -19,7 +19,43 @@
     "fixed_material",
     "open_retrieval"
   ],
-  "runs": {},
+  "runs": {
+    "fixed_material": {
+      "B_generic": {
+        "output_file": "outputs/fixed_material__B_generic.md",
+        "budget_used": {
+          "tool_calls": 19,
+          "searches": 0,
+          "wall_clock_seconds": 191,
+          "tokens": 67629
+        },
+        "artifacts": {},
+        "recorded_at": "2026-09-09T20:37:11.677211"
+      },
+      "C_new": {
+        "output_file": "outputs/fixed_material__C_new.md",
+        "budget_used": {
+          "tool_calls": 36,
+          "searches": 0,
+          "wall_clock_seconds": 236,
+          "tokens": 109686
+        },
+        "artifacts": {},
+        "recorded_at": "2026-09-09T20:37:55.677272"
+      },
+      "A_current": {
+        "output_file": "outputs/fixed_material__A_current.md",
+        "budget_used": {
+          "tool_calls": 14,
+          "searches": 0,
+          "wall_clock_seconds": 283,
+          "tokens": 93774
+        },
+        "artifacts": {},
+        "recorded_at": "2026-09-09T20:38:36.232984"
+      }
+    }
+  },
   "note": "3 案试水轮。固定材料轮：三条路径读同一快照、**禁止检索**（searches 上限 0），预算天然可比，测的纯粹是推理。三条路径由隔离上下文的 subagent 分别产出。",
   "voided_rounds": {
     "fixed_material__asymmetric_prompts": {
