@@ -35,6 +35,23 @@ BUDGET_TOLERANCE = 1.5
 
 BUDGET_KEYS = ('tool_calls', 'searches', 'wall_clock_seconds', 'tokens')
 
+# 两类计量必须分开对待——把它们混成一个"预算可比性"数字是仪器的原始缺陷（见下）。
+#
+# GRANTED：**授予或扣留**的资源。一条路径拿到更多证据访问，对照就失效，
+#          因为你分不清"分析更好"和"看到的更多"。这是**硬校验**。
+# CONSUMED：**消耗**出来的量。一个方法读自己更长的规范、想得更久，那是它的成本，
+#          不是不公平的输入。这是**成本发现**，要报告、要成为结论的限定条件，但**不阻断**。
+#
+# 为什么这个区分是必需的：试水轮实测三条路径 tokens 差 2.5×、wall_clock 差 11×，
+# 而三条读的是同一份材料、searches 全为 0。按旧逻辑整轮判为"不可比"——
+# 那等于说"新方法只要更费就不能被评估"，把成本问题误当成效度问题。
+# 反过来若直接放宽阈值，又会掩盖一个**真实**的效度威胁：
+# 算力差异本身可能就是输出差异的原因（"C 更好"也许只是"C 想得更久"）。
+# 正确做法是两者都说：证据访问可比 → 可以送评；算力不可比 → 任何"C 更好"的结论
+# 都必须带着这个限定，且成本要与增量一起报。
+GRANTED_KEYS = ('searches',)
+CONSUMED_KEYS = ('tool_calls', 'wall_clock_seconds', 'tokens')
+
 # 篇幅差异容忍度。这不是预算，是**评审偏倚**：更长的报告天然显得更用心，
 # 而方案 §14.4 明确说"报告更长"不得作为成功指标。
 # 试点实测三条路径差到 3.3×——不提醒的话，盲评拿到的就是一场篇幅比赛。
@@ -109,10 +126,15 @@ def record_run(case_id: str, path: str, round_name: str, output_text: str,
 
 def check_comparability(case_id: str, round_name: str) -> dict:
     """
-    三条路径在同一轮里的预算是否可比。**硬校验**：不可比就不该拿去比。
+    三条路径在同一轮里是否可比。返回两个层次的判断，**不要混着看**：
 
-    也校验 budget_cap：超过预登记上限的运行同样不可用——
-    上限是跑之前定的，跑完再说"多花了一点"就是事后放宽标准。
+    - `comparable`（硬）：**授予的资源**是否等量、是否超出预登记上限。
+      不通过就不该拿去比，也不该打包送评。
+    - `cost` + `warnings`（软）：**消耗**差异。不阻断，但任何"某条路径更好"的结论
+      都必须带上这个限定——差异可能部分来自它算得更久。
+
+    `budget_cap` 只对授予类资源生效。对消耗类设上限没有意义：
+    没人能在跑之前控制一个方法要想多久，跑完再拿它当"超标"是在用事后数据判无效。
     """
     manifest = load_manifest(case_id)
     if manifest is None:
@@ -125,31 +147,53 @@ def check_comparability(case_id: str, round_name: str) -> dict:
                 'errors': [f'{round_name} 轮缺少路径 {missing_paths} 的输出——三条齐全才能比'],
                 'recorded_paths': sorted(runs)}
 
-    problems, ratios = [], {}
+    problems, ratios, warnings = [], {}, []
     cap = manifest.get('budget_cap') or {}
-    for key in BUDGET_KEYS:
+
+    def _ratio(key):
         values = {p: runs[p]['budget_used'][key] for p in PATHS}
         nonzero = [v for v in values.values() if v > 0]
         if not nonzero:
-            continue
+            return values, None
         lo, hi = min(nonzero), max(values.values())
-        ratio = hi / lo if lo else float('inf')
+        return values, (hi / lo if lo else float('inf'))
+
+    # ── 硬校验：授予的资源必须等量，超出预登记上限同样不可用 ──
+    for key in GRANTED_KEYS:
+        values, ratio = _ratio(key)
+        if ratio is None:
+            ratios[key] = 1.0          # 三条都是 0，例如固定材料轮禁检索：完全等量
+            continue
         ratios[key] = round(ratio, 3)
         if ratio > BUDGET_TOLERANCE:
             worst = max(values, key=values.get)
             problems.append(
                 f'{key} 最高/最低 = {ratio:.2f}×（>{BUDGET_TOLERANCE}）：'
-                f'「{worst}」花了 {values[worst]}，最省的只花了 {lo}——'
-                f'预算不可比，差异可能只反映投入不同'
+                f'「{worst}」拿到 {values[worst]}，最少的只有 {min(values.values())}——'
+                f'证据访问不等量，分不清"分析更好"还是"看到的更多"'
             )
         if key in cap:
             over = [p for p, v in values.items() if v > cap[key]]
             if over:
                 problems.append(f'{key} 超出预登记上限 {cap[key]}：{over}')
 
+    # ── 成本发现：消耗差异不阻断，但必须成为结论的限定条件 ──
+    cost = {}
+    for key in CONSUMED_KEYS:
+        values, ratio = _ratio(key)
+        cost[key] = {'values': values, 'ratio': round(ratio, 3) if ratio else None}
+        if ratio and ratio > BUDGET_TOLERANCE:
+            worst = max(values, key=values.get)
+            warnings.append(
+                f'算力不等量：{key} 最高/最低 = {ratio:.2f}×，最费的是「{worst}」'
+                f'（{values[worst]} vs {min(v for v in values.values() if v > 0)}）。'
+                f'不阻断——这是方法的成本，不是不公平的输入。但**任何"该路径更好"的结论'
+                f'都必须带上这个限定**：差异可能部分来自它算得更久，而不是方法本身'
+            )
+
     # 篇幅偏倚：不阻断（篇幅差异本身可能就是方法差异的真实结果），但必须让评审组织者看见，
     # 并在评分说明里明确要求评审不得以长度作为增量依据。
-    lengths, warnings = {}, []
+    lengths = {}
     for p in PATHS:
         f = case_dir(case_id) / runs[p]['output_file']
         lengths[p] = len(f.read_text(encoding='utf-8')) if f.exists() else 0
@@ -165,8 +209,10 @@ def check_comparability(case_id: str, round_name: str) -> dict:
                 f'否则盲评会退化成篇幅比赛'
             )
 
-    return {'comparable': not problems, 'ratios': ratios,
-            'output_lengths': lengths, 'warnings': warnings, 'errors': problems}
+    return {'comparable': not problems, 'ratios': ratios, 'cost': cost,
+            'output_lengths': lengths, 'warnings': warnings, 'errors': problems,
+            'note': ('comparable 只回答"授予的资源是否等量"；'
+                     'cost 与 warnings 回答"谁更费"，后者不阻断但必须写进结论的限定条件')}
 
 
 def package_for_review(case_id: str, round_name: str) -> dict:

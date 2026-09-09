@@ -1,8 +1,13 @@
 """
-对照运行记录器的测试——重点是**预算可比性是硬校验**这件事。
+对照运行记录器的测试。
 
-评估里最容易被糊弄的一环：给想验证的那条路径多跑几轮，然后把差异当成方法的功劳。
-所以下面有负控：把容忍度放大，不可比的用例必须变成"可比"，证明这条校验真的在起作用。
+核心区分（真实运行才逼出来的）：
+  - **授予的资源**不等量 → 硬阻断。给想验证的那条路径多喂证据，差异就说明不了任何事。
+  - **消耗**不等量 → 报告成本，不阻断。一个方法读自己更长的规范、想得更久，
+    那是它的成本，不是不公平的输入；但它同时是对"更好"这个结论的真实威胁，
+    所以必须变成结论的限定条件。
+
+两处都有负控：放宽容忍度后，原本该红的必须变绿。
 """
 
 import sys
@@ -76,6 +81,7 @@ def test_comparable_budgets_pass():
 
 
 def test_lopsided_search_budget_is_rejected():
+    # searches 是**授予**的资源：多给一条路径检索次数 = 多给它证据 → 硬阻断
     _init(cap={'searches': 100})
     _record_all(budgets={'A_current': _budget(searches=4), 'B_generic': _budget(searches=4),
                          'C_new': _budget(searches=12)})   # 新版多跑 3 倍
@@ -84,7 +90,47 @@ def test_lopsided_search_budget_is_rejected():
     assert any('C_new' in e and 'searches' in e for e in r['errors'])
 
 
+def test_higher_consumption_is_cost_not_invalidity():
+    """真实运行发现：三条路径 tokens 差 2.5×、wall_clock 差 11×，但读的是同一份材料。
+
+    按旧逻辑整轮判"不可比"，等于说"新方法只要更费就不能被评估"——
+    那是把成本问题误当成效度问题。现在改为报告成本 + 强制限定，不阻断。
+    """
+    _init(cap={'searches': 0})
+    _record_all(budgets={
+        'A_current': _budget(searches=0, calls=3, seconds=620, tokens=104858),
+        'B_generic': _budget(searches=0, calls=2, seconds=56, tokens=58316),
+        'C_new':     _budget(searches=0, calls=12, seconds=604, tokens=143854)})
+    r = run_case.check_comparability('PILOT-00', 'fixed_material')
+    assert r['comparable'] is True, '证据访问等量（searches 全为 0）就不该阻断'
+    assert r['cost']['tokens']['ratio'] > 2
+    assert any('算力不等量' in w and '限定' in w for w in r['warnings'])
+
+
+def test_zero_search_round_counts_as_exact_parity():
+    _init(cap={'searches': 0})
+    _record_all(budgets={p: _budget(searches=0) for p in run_case.PATHS})
+    r = run_case.check_comparability('PILOT-00', 'fixed_material')
+    assert r['comparable'] is True
+    assert r['ratios']['searches'] == 1.0
+
+
+def test_negative_control_consumption_warning_disappears_when_loosened(monkeypatch):
+    """负控：放宽容忍度后，成本告警必须消失——证明它真的由比值驱动。"""
+    _init(cap={'searches': 0})
+    _record_all(budgets={
+        'A_current': _budget(searches=0, tokens=100000),
+        'B_generic': _budget(searches=0, tokens=50000),
+        'C_new':     _budget(searches=0, tokens=150000)})
+    assert any('算力不等量' in w
+               for w in run_case.check_comparability('PILOT-00', 'fixed_material')['warnings'])
+    monkeypatch.setattr(run_case, 'BUDGET_TOLERANCE', 100.0)
+    assert not any('算力不等量' in w
+                   for w in run_case.check_comparability('PILOT-00', 'fixed_material')['warnings'])
+
+
 def test_exceeding_pre_registered_cap_is_rejected():
+    # 上限只对授予类资源生效
     _init(cap={'searches': 5})
     _record_all(budgets={p: _budget(searches=6) for p in run_case.PATHS})
     r = run_case.check_comparability('PILOT-00', 'fixed_material')
@@ -144,7 +190,7 @@ def test_length_disparity_is_flagged_but_not_blocking():
     assert any('篇幅' in w and '不得以长度' in w for w in r['warnings'])
 
 
-def test_similar_lengths_produce_no_warning():
+def test_similar_lengths_and_costs_produce_no_warning():
     _init()
     for path in run_case.PATHS:
         run_case.record_run('PILOT-00', path, 'fixed_material', 'x' * 1000, _budget())
