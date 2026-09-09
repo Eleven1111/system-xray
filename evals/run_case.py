@@ -124,6 +124,41 @@ def record_run(case_id: str, path: str, round_name: str, output_text: str,
     return {'errors': [], 'manifest': manifest}
 
 
+def record_from_staging(case_id: str, path: str, round_name: str,
+                        budget_used: dict, staging_map: dict) -> dict:
+    """
+    把 `_staging/<slug>.md` 的产出按映射搬到正式位置并记录。
+
+    产出文件名在跑的时候是不透明的 slug，不是 `fixed_material__C_new.md`——
+    否则等于在提示词里告诉 agent"你是新方法"，那是一条只喂给它的额外信息。
+    映射由组织者持有，跑完才落位。
+
+    同时校验共同字符上限：**超限是运行未完成**，返回 errors，不静默收下。
+    """
+    from evals.prompt_builder import check_output_length
+
+    slug = (staging_map.get(case_id) or {}).get(path)
+    if not slug:
+        return {'errors': [f'{case_id}/{path} 没有 staging 映射']}
+    src = case_dir(case_id) / 'outputs' / '_staging' / f'{slug}.md'
+    if not src.exists():
+        return {'errors': [f'{src} 不存在——该路径没有产出']}
+
+    text = src.read_text(encoding='utf-8')
+    manifest = load_manifest(case_id) or {}
+    cap = manifest.get('output_char_cap')
+    length = check_output_length(text, cap) if cap else {'chars': len(text)}
+    if cap and not length['within_cap']:
+        return {'errors': [f'{case_id}/{path} 超出共同上限 {cap} 字符 '
+                           f'{length["overflow"]} 字符（实际 {length["chars"]}）——'
+                           f'按修订 4 记为未完成'],
+                'length': length}
+
+    res = record_run(case_id, path, round_name, text, budget_used)
+    res['length'] = length
+    return res
+
+
 def check_comparability(case_id: str, round_name: str) -> dict:
     """
     三条路径在同一轮里是否可比。返回两个层次的判断，**不要混着看**：
