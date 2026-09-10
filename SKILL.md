@@ -24,9 +24,76 @@ This skill has supporting reference materials in `references/`:
 - `research-protocol.md` — Structured search queries by system type (public co, DAO, govt, etc.) with source credibility tiers
 - `scoring-calibration.md` — Anchor cases for 1-5 scores (Berkshire, Enron, FTX, etc.) to prevent score drift across analyses
 - `question-banks.md` — Per-dimension interview question banks for users with insider knowledge
-- `diagnostic-schema.json` — Machine-readable JSON schema for structured output; use when the user wants to track analyses over time or compare multiple systems
+- `diagnostic-schema.json` — **The single specification for fields, enums and the data contract.** Every tool and every report reads from the same record: `claims` → `mechanisms` → judgments → `predictions` / `actions`, plus `completeness`, `analysis_contract` and `coverage_audit`
+- `report-template.md` — The single report skeleton (decision summary → … → audit appendix). Rendering style is separate from analysis rules
+- `methods/*.md` — Method cards, loaded on demand: `evidence.md`, `mechanism.md`, `dynamics.md`, `forecast.md`, `decision.md`. Each card is 问题 → 假设 → 观测 → 推论 → 反证 → 行动 → 适用限制
 
 Always read `scoring-calibration.md` before assigning any dimension scores.
+
+## 能力分层与边界（先读这一节）
+
+这个 skill 把零散证据变成**可检验的机制解释**，再把机制解释变成**有条件、可回看、可调整的决策依据**。
+它做四个连接：事实↔机制、机制↔动态、动态↔行动、行动↔学习。
+
+**因果能力分三级，不得越级承诺：**
+
+| 级别 | 何时启用 | 能输出什么 |
+|---|---|---|
+| **L1 解释性机制图**（默认） | 总是 | 变量与有向关系，标注关联/假设因果/受支持机制；只给**条件性方向推演** |
+| **L2 参数化局部模型** | 有单位、数据或可说明的专家范围时 | 需时间步长、初值、延迟、参数区间、边界条件与敏感性检验；结论依赖任意参数即判为不稳健 |
+| **L3 因果效果估计** | 仅当定义了估计目标且存在可辩护的识别策略 | 交给因果工具；须一并输出数据、识别假设、估计与反驳结果，以及**适用群体和时间范围** |
+
+**L2 与 L3 是并列的两种能力，不是阶梯**——效果估计不需要先有参数化仿真模型，反之亦然。
+`causal_readiness()` 分别检查两组入口条件，缺项即拒绝升级：
+
+```bash
+python3 -m agent.agent --causal-readiness --input analysis.json  # 还差哪些条件
+python3 -m agent.agent --backends                                # 有哪些后端可用
+python3 -m agent.agent --simulate --input l2.json                # L2：{mechanism, model, verdict}
+python3 -m agent.agent --estimate-effect --input l3.json          # L3：{mechanism, spec}
+```
+
+- **L2**（`stock_flow.py`）：线性存量—流量 + 一阶物质延迟 + 显式欧拉积分。
+  最重要的输出不是曲线，是**稳健性判定**——在参数区间的角点上重跑，定性结论一翻转就报
+  `robust=false` 并点名是哪个参数翻的。**没有 `parameter_ranges` 就拒绝出结论**：
+  单点运行只是把任意假设包装成结果。
+- **L3**（`causal_adapter.py`）：先能力检测。当前执行器始终使用内置最小双重差分；即使环境装有 DoWhy 也不会声称已调用它，
+  并在输出里**明确标注它不是 DoWhy 的替代品**。数字永远与识别假设、适用群体、时间范围、
+  安慰剂与留一反驳结果一起出现。数据形状不支持所选策略（比如没有对照组）→ 拒绝估计。
+
+**禁止**由 L1 的箭头、序数分数或自定传播系数直接生成 L3 风格的效果承诺。
+含反馈的机制图不能当作无环因果图；需要统计识别时必须按时间展开或采用明确适合反馈的建模方法。
+
+**本 skill 不做的事**（说清楚比含糊承诺更有用）：
+- 不做持续监测。更新在用户**再次调用**时发生；`skill` 文件本身没有调度器。
+- 不做**通用**仿真或因果推断。内置的是够用来回答一个具体问题的最小实现
+  （线性存量—流量、双重差分）；需要非线性、协变量调整、工具变量或面板处理时，
+  该上 PySD / Vensim / DoWhy，本 skill 只负责**判断该不该升级**并交接。
+- 不保证研究准确性。单元测试通过只证明工具行为符合定义，不证明结论为真。
+- **没有做过真实案例的对照评估**。已经跑通的是：227 个单元/契约测试、
+  11 条对抗用例（`evals/adversarial.py`，带负控）、8 条合成机制案例与消融
+  （`evals/synthetic.py`）。这些都是在**构造出来的输入**上验证逻辑——
+  它们不证明研究准确性、因果识别有效性或预测优于基线。
+  真实案例的三路径对照、盲评与决策增量打分见 `evals/protocol.md`，**尚未执行**。
+
+### 重复分析时（跨期更新）
+
+版本**不可变**：同一天分析两次会产生两个版本（`20260908-001` / `-002`），后一版不覆盖前一版，
+可按 `analysis_id` 精确重建当时的输入、判断与预测。`index.json` 只是可重建的指针。
+
+```bash
+python3 -m agent.agent --system "X" --versions                    # 列出版本
+python3 -m agent.agent --system "X" --changes --input new.json    # 判断变更 + 口径可比性
+python3 -m agent.agent --staleness --input analysis.json          # 按断言类型的时效体检
+python3 -m agent.agent --predictions-due --input analysis.json -d 2026-09-08
+```
+
+**完整性与不确定性分开记录**（`completeness`）：
+`draft`（结构或研究步骤未完成）/ `partial`（核心材料、流程或范围覆盖不足）/
+`complete_with_uncertainty`（约定分析工作完成，机制与事实仍有不确定）。
+**不存在"流程完成＝事实真实"的状态。** `needs_review` 是断言/机制/判断/行动的复核标志，
+与报告完整性并列——它不抹去已完成的研究步骤。草稿可以保存；
+高风险未决断言可以让依赖它的**行动**不可推荐，但不应导致全部研究成果无法保存。
 
 This skill has an `agent/` directory with full orchestrator-subagent infrastructure:
 - `agent/prompts/system.md` — **Orchestrator** 提示词（调用工具、派发 Researcher、综合分析）
@@ -38,7 +105,20 @@ This skill has an `agent/` directory with full orchestrator-subagent infrastruct
 - `agent/tools/causal_graph.py` — 跨维因果图引擎（纯计算）：反馈回路检测与恶性/良性分类、杠杆点排序（Meadows）、干预传播模拟、处方溢出交叉检查——Step 5.2/5.6 的"逻辑后果"不再靠手工记账
 - `agent/tools/ach_score.py` — ACH 定量评分（纯计算）：信源层级加权（T1 的 I ≫ T3 的 I）+ 鉴别力降权（全 C 证据无区分力）+ 假说状态机械判定（eliminated/stressed/active/untestable）+ 结构性 flags（全部存活=高不确定）
 - `agent/store/db.py` — 持久化（JSON + MD素材 + HTML智库报告 + 雷达图SVG + 预测加载）+ 落盘校验（`validate_analysis`：维度/预测/`dimension_evidence` 强制）+ 流程告警（`process_warnings`：Round2/ACH/信源核验跳过非阻塞提醒）+ 信源审计生成（`build_source_audit_html`：逐条 URL + 核验徽章）+ 信源核验选样（`select_verification_sample`：挑最该 WebFetch 抽查的高权重/定量信源）+ 综述类错误分诊（`triage_claims_for_factcheck`：挑载荷性∩薄佐证断言交独立 fact_check sub-agent 复核）
-- `agent/agent.py` — CLI 辅助工具（查询集预览、历史记录查看）
+- `agent/validation.py` — 统一契约校验（结构 / 依赖一致性 / 状态 / 预测语义 / 时效 / 注入扫描），
+  各 CLI 出口复用；含 **L2/L3 因果能力入口门**（`causal_readiness`）与消融开关（`ablate=`）
+- `agent/tools/evidence_lineage.py` — 来源家族折叠、断言支持关系、**受影响结论传播**（某断言被推翻时，
+  哪些机制/预测/行动须标 `needs_review`）
+- `agent/tools/temporal.py` — 双时间校验、**按断言类型的时效**、口径可比性、判断变更分类
+- `agent/tools/forecast_registry.py` — 预测冻结与版本（更新产生新版本，初始值不被覆盖）、
+  预先声明的复盘取版本策略、按 `event_type` 判定谁可裁定
+- `agent/tools/stock_flow.py` — **L2** 存量—流量局部模型：一阶延迟 + 参数区间角点扫描 +
+  稳健性判定；缺参数区间即拒绝出结论
+- `agent/tools/causal_adapter.py` — **L3** 效果估计：后端能力检测（DoWhy 有则用，没有则用
+  内置最小双重差分并明确标注）+ 安慰剂与留一反驳；数据形状不支持策略即拒绝估计
+- `agent/agent.py` — CLI 辅助工具（查询集预览、历史版本、契约校验、血缘、变更、时效、能力分层、L2/L3）
+- `evals/` — 可执行：对抗用例套件（11 条 + 负控）、合成机制案例与消融实验（8 条）、
+  决策增量评分器与盲评打包；**未执行**：真实案例三路径对照（`protocol.md` 预登记模板）
 
 ---
 
@@ -94,13 +174,28 @@ Orchestrator（你）
 
 ---
 
+## ⛔ 分析契约（开始前先定，写入 `analysis_contract`）
+
+四件事必须在派研究员之前定下来，否则"做完了没有"无从判断：
+
+1. **目标**：这次分析要支持哪个决策？
+2. **权限**：读者能直接做、能推动别人做，还是只能监测？（行动卡不得超出这个边界）
+3. **`as_of`**：知识截止日。
+4. **预算与停止条件**：**先写**停止条件——核心机制已覆盖 / 剩余缺口不改变当前行动 /
+   连续检索只返回同源信息 / 预算耗尽。预算耗尽时输出 `partial` 与未完成项，不强行声称完整。
+
+检索优先级按"**哪些未知最可能改变当前决策**"排序（决策影响 / 解释鉴别力 / 可核验性 / 成本，
+高中低透明分级），不是"把所有查询跑完"。只有能合理估计收益与成本时才用定量信息价值——
+不为每条检索伪造一个精确 EVSI 分值。
+
 ## ⛔ 前置门控（Orchestrator 开始前必须通过）
 
 进入七维分析前，必须满足：
 - [ ] 所有 Priority 1 视角有至少 1 条有效信源（T1 或 T2）
 - [ ] 矛盾信号已在 Research Brief 中显式标注
 - [ ] Research Brief 已呈现用户并确认
-- [ ] 每个维度评分有对应信源（不得使用训练知识作为唯一依据）
+- [ ] 每个维度评分有对应信源（不得使用训练知识作为唯一依据）；**证据不足写 `unknown`、
+      不适用写 `not_applicable`，不用中间分 3 填补**
 
 可用系统类型：`geopolitical` / `government_agency` / `public_company` / `private_company` / `dao` / `market` / `platform` / `relational`
 
@@ -108,7 +203,11 @@ Orchestrator（你）
 
 ---
 
-## 信源层级（贯穿全流程）
+## 信源层级与断言级证据契约（贯穿全流程）
+
+**层级描述的是材料类型，不是断言的真实性。** 同一份官方文件可以高度可靠地证明"某项规则已经发布"，
+却不足以独立证明"规则实施效果良好"。因此层级只用于**排序与选样**（该先核验谁、哪条 I 的排除力更强），
+不作为"这条断言成立"的裁决依据。
 
 | 层级 | 英文信源 | 本地语言信源 |
 |------|---------|------|
@@ -116,6 +215,19 @@ Orchestrator（你）
 | T2 | 路透社、FT、WSJ、BBC、智库报告、学术论文 | 各国机构媒体/智库 |
 | T3 | Glassdoor、Reddit、Twitter/X、匿名来源 | 各国社交媒体/论坛 |
 | ⚠️ | 训练知识（须标注，不计入评分依据） | 同左 |
+
+每条载荷性断言另记（schema `claims[]`，方法卡见 `references/methods/evidence.md`）：
+
+- **对该断言的直接程度**（direct / indirect / inferred）与**关系**（supports / contradicts / background）
+- **来源家族**（`source_family`）与血缘（original / reprint / translation / quotation）——
+  **同一原始出处的转载、翻译、引用只算一份独立权重**。四篇转载同一公告不是四条独立支持。
+- 原文摘录与位置（页码/段落/时间戳）、事件时间、数字口径、适用时间
+- 观测与发布主体的利益关系
+- **可达状态**（reachable / unavailable / unchecked）与**核验状态**
+  （supported / contradicted / unresolved）——**二者不可混为一谈**：链接打不开不等于断言为假；
+  链接能打开也不等于断言被证实。
+
+不要把这些信息再压缩成一个万能可靠性分数。排序可以用简单规则，但报告必须保留依据。
 
 支持 6 种本地语言自动检测：中文(zh)、阿拉伯语(ar)、波斯语(fa)、俄语(ru)、日语(ja)、韩语(ko)。
 分语种 T1/T2/T3 详表见 `agent/prompts/researcher-sources.md`。检测返回 set，可同时触发多语言。
@@ -128,21 +240,29 @@ Orchestrator（你）
 
 HTML 报告（8b）按**分层阅读**组织——5 分钟读者只看摘要 + 每章标题、20 分钟读者看摘要 + 每章首段 + 图表、深度读者读全文：**每个章节标题本身即一个判断句**（不写"市场分析"，写"该市场正在向高端化集中"），**每章首句即结论**（先描述现象给认同感入口、再立刻给判断）。摘要与标题结论前置，全文反顾问腔/AI腔（禁用"赋能/协同/价值创造"等空心大词）。完整规范见 `agent/prompts/system.md`「输出格式：分层阅读设计」节。
 
-**完整模式（默认）：** 上期预测复盘（仅有历史预测时）→ 执行摘要（散文）→ 系统制图 → 七维诊断（每维 2-4 段散文）→ 交叉维度 → 风险节点 → 演化情景 → 可证伪预测 → 监控仪表板 → 信源审计（折叠）
+**完整模式（默认）：** 决策摘要 → 系统边界与目标 → 已知事实与未知 → 核心机制与替代解释（通常深入 1-3 条，
+不是七维等长铺陈）→ 动态变化与条件未来 → 行动卡 → 判断变更记录（重复分析时）→ 审计附录。
+详见 `references/report-template.md`。
 
-**精简模式（用户说"精简"/"快速"）：** 执行摘要（散文）→ 三个风险节点 → 三条建议 → 信源审计（不可删）
+**精简模式（用户说"精简"/"快速"）：** 缩短叙述，但**不删**关键证据、核心替代解释与行动条件——
+读者仍须能沿一条主张追溯到具体摘录。信源审计不可删。
 
-### 三重输出格式（Step 8）
+### 输出格式（Step 8）：默认单份 Markdown + 结构化底稿
 
-每次分析完成后，同时生成三份输出并保存到 Obsidian 仓库：
+**默认交付 = 一份 Markdown 报告 + 一份结构化 analysis JSON。** 报告骨架见
+`references/report-template.md`。HTML、Obsidian 素材等属于**按需导出**，
+不再用"三件套齐全"定义分析完成——文件份数从来不是分析质量的度量。
 
-| 文件 | 格式 | 用途 | 函数 |
-|------|------|------|------|
-| `{date} {name} 研究素材.md` | MD | 原始信源 + 矛盾信号 + 覆盖缺口 | `save_research_materials()` |
-| `{date} {name} 诊断报告.html` | HTML | Brookings/CSIS 智库风格可读报告（含雷达图） | `save_html_report()` |
-| `{date} {name} 系统诊断.md` | MD | 《纽约客》式叙事特稿（给人读的可读长稿，正文叙事 + 末尾诊断速览，详见 system.md Step 8c） | `save_to_obsidian()` |
+| 输出 | 何时生成 | 函数 |
+|------|---------|------|
+| analysis JSON（结构化底稿：claims / mechanisms / actions / coverage_audit） | **总是**——报告由它生成，不是反过来 | `save_analysis()` |
+| `{date} {name} 系统诊断.md` | **总是**——默认可读交付 | `save_to_obsidian()` |
+| `{date} {name} 研究素材.md` | 用户需要原始信源存档时 | `save_research_materials()` |
+| `{date} {name} 诊断报告.html` | 用户明确要智库风格 HTML（含雷达图）时 | `save_html_report()` |
 
-HTML 报告使用 `build_radar_svg(scores)` 生成七维雷达图内联 SVG。Orchestrator 负责 MD→HTML 转换，详见 `agent/prompts/system.md` Step 8b。
+输出目录默认走 `SYSTEM_XRAY_OUTPUT_DIR` 环境变量，未设置时才回落到本机 Obsidian 仓库。
+HTML 导出使用 `build_radar_svg(scores)` 生成雷达图内联 SVG；MD→HTML 转换规则见
+`agent/prompts/system.md` Step 8b。
 
 ---
 
@@ -193,7 +313,7 @@ Ask the user:
 If user provides a system name without context, determine the system type first (see `agent/tools/query_generator.py` SYSTEM_TYPES), then launch the Orchestrator pipeline described above — do not run ad-hoc searches outside the structured Researcher dispatch.
 
 **Determine user's access level:**
-- If user is an **insider** (employee, board member, investor with inside access): After intake, offer to run the diagnostic question bank from `references/question-banks.md` before public research. Insider knowledge > any public source.
+- If user is an **insider** (employee, board member, investor with inside access): After intake, offer to run the diagnostic question bank from `references/question-banks.md` before public research. Insider testimony gives access to **unpublished observations** — informal rules, what actually gets rewarded, which numbers nobody trusts — that no public source will carry. It is not automatically more accurate: insiders have interests, blind spots and a position in the very information flow under diagnosis (an insider whose reports get filtered upward is *evidence of* D3 pathology, not a neutral witness). Treat it as a source with high directness and known interest — record it in `claims[]` with `lineage: "original"`, the informant's vantage point and their stake, and cross-check load-bearing insider claims against observable outcomes where possible.
 - If user is an **outsider** (analyst, competitor, curious observer): Skip question banks, go straight to public research protocol.
 - If **mixed**: Use public research first, then targeted questions to fill specific gaps.
 
@@ -239,17 +359,91 @@ Present this cartography to the user as a structured overview before diving into
 
    **Key principle:** One strong I outweighs ten Cs. Most evidence is consistent with multiple hypotheses (shared predictions). What distinguishes hypotheses is inconsistent evidence.
 
-3. **Hypothesis ranking** — Computed by `agent/tools/ach_score.py` (via `python3 -m agent.agent --ach-score`), not by eyeball. The tool applies tier-weighted inconsistency (a T1 "I" carries 3x the elimination force of a T3 "I"), diagnosticity down-weighting (evidence rating all hypotheses identically has no discriminating power), and assigns each hypothesis a status:
-   - **Active**: Cannot be eliminated by current evidence
-   - **Stressed**: Inconsistent evidence exists but below elimination threshold (e.g., I-marks only from T3 sources)
-   - **Eliminated**: Weighted inconsistency ≥ threshold (e.g., one fully-diagnostic T1 contradiction)
+   **Independent evidence families:** before rating, tag reprints, translations and quotations of one
+   original with the same `source_family`. The tool collapses each family to a single weight —
+   repetition must never accumulate into certainty. Four outlets carrying one company press release
+   are one piece of evidence, not four.
+
+3. **Hypothesis ranking** — Computed by `agent/tools/ach_score.py` (via `python3 -m agent.agent --ach-score`), not by eyeball. The tool collapses duplicate evidence families, then applies tier-weighted inconsistency (a T1 "I" carries 3x the refuting force of a T3 "I") and diagnosticity down-weighting (evidence rating all hypotheses identically has no discriminating power), and assigns each hypothesis a status:
+   - **Active**: Cannot be refuted by current evidence — *not* "established"
+   - **Stressed**: Inconsistent evidence exists but below the refutation threshold (e.g., I-marks only from T3 sources)
+   - **Eliminated**: Weighted inconsistency ≥ threshold — read this as **conditionally refuted under the
+     listed evidence and the current C/I/N coding**, not as proven false. New evidence or a defensible
+     recoding can revive it.
    - **Untestable**: All evidence neutral — flagged as "untestable", never promoted to "supported"
+
+   ACH scores are **not posterior probabilities** and must never be reported as such.
+
+3b. **Sensitivity is part of the output** — the tool returns `sensitivity.leave_one_out`: which
+   evidence families are decisive (removing one flips a status). A non-empty list means the conclusion
+   depends on a key assumption and the report must say so. Also re-run with contested C/I/N codings
+   switched to their defensible alternative; if the ranking flips, report
+   "evidence cannot discriminate" rather than a single preferred explanation.
 
 4. **Injection into diagnosis** — Surviving hypotheses are passed to Stage 2. Each dimension analysis must note how its findings appear under each surviving hypothesis. If a dimension score would differ significantly across hypotheses, report a score range rather than a single number.
 
 **If all hypotheses survive:** This is itself a key finding — the system is in a high-uncertainty state where multiple explanatory models remain viable.
 
 **If no hypotheses survive:** Re-examine the evidence matrix for errors, or generate additional hypotheses.
+
+### Stage 1.8: 七维是导航层，机制卡才是分析单位
+
+七个维度继续用于**阅读、提问和历史检索**——它们是标签系统，让不同分析可以互相索引。
+但底层判断使用**明确变量**（"异常上报延迟""现金缓冲""规则修改权限"），
+**不再用"D3 增加 1 分"代表一个可执行干预**：相同的"健康分"可能来自完全不同的机制，
+也可能掩盖群体之间的损益冲突。
+
+**评分显示格式**：`状态描述 + 可选序数等级 + 支撑证据 + 不确定范围 + 口径版本`。
+改变口径后，历史分数标为不可直接比较（`score_basis_version`）。
+
+#### 要素覆盖审计（`coverage_audit`）
+
+这是**审计表，不是固定十二章**。每项标 `covered / unknown / not_applicable` 并给证据或理由；
+对当前决策有实质影响的未知项优先补证，低相关项不强制扩写。
+
+| 要素组 | 必须回答的问题 | 与七维的主要联系 |
+|---|---|---|
+| 目标与评价主体 | 系统为谁创造什么结果？生存、效率、公平与安全是否冲突？ | D2、D5、D7 |
+| 边界与环境 | 纳入哪些主体、空间、时间与外部约束？排除了谁承担的成本？ | D1、D6 |
+| 行为体与能力 | 谁决定、谁执行、谁受影响？能力、资源与权限是否匹配？ | D2、D7 |
+| 规则与元规则 | 正式和实际规则是什么？谁能改变规则，谁能否决？ | D1、D2、D7 |
+| 资源与存量 | 资金、库存、产能、人才、信任如何积累与消耗？哪些只有定性代理指标？ | D1、D4、D6 |
+| 信息与测量 | 什么被观测，什么没有上报？数据由谁生成，是否受激励影响？ | D3、D2 |
+| 生产与服务过程 | 输入如何变成实际结果？瓶颈、质量和维护负担在哪里？ | D4、D6 |
+| 依赖与替代 | 单点、共同原因、供应依赖、替代时间与切换成本是什么？ | D1、D6 |
+| 权力与合法性 | 事实控制、授权、问责与公众接受是否一致？ | D5、D7 |
+| 时间与适应 | 反馈延迟、恢复速度、路径依赖、学习与退出能力如何？ | D3、D4 |
+| 分配与外部性 | 哪些群体获益、受损或缺席？局部改善是否转移了系统成本？ | 横跨七维 |
+| 分析者与干预反应 | 报告、指标或政策公开后，主体会如何调整行为、隐瞒或套利？ | D2、D3、D7 |
+
+#### 多层系统与边界敏感性
+
+至少检查"外部环境—目标系统—关键子系统"三层关系，但**只在有解释价值时展开**。
+部门绩效改善可能来自把积压转交外部供应商；平台留存提高可能来自增加用户退出成本——
+这些变化一个整体健康分看不出来。
+
+每次关键诊断做一次**边界敏感性检查**（`boundary_sensitivity`）：纳入或排除一个重要主体后，
+结论是否改变？若改变，报告必须写清结论对边界的依赖。
+
+#### 机制卡（`mechanisms[]`）——最小分析单位
+
+| 字段 | 内容 |
+|---|---|
+| 解释目标 | 要解释的现象、对象、时间窗口与比较基准 |
+| 机制链 | 行为体在何种规则和约束下采取什么行为，经什么中介过程导致什么结果 |
+| 可观察变量 | 定义、单位或代理指标、数据获取方式与缺失情况 |
+| 支持与反对 | 关联断言 ID、原文位置、时间、来源家族及证据角色 |
+| 替代解释 | **至少一个**会导向不同观察或行动的解释；确无合理替代时说明搜索过程 |
+| 鉴别预测 | 若机制成立，相比替代解释应该额外看到什么 |
+| 失效条件 | 哪条观察会使该机制降级、暂停使用或被替代 |
+| 行动影响 | 改变哪项选择；如果不影响行动，说明其解释价值 |
+
+通常深入 **1-3 条**机制，不做七维等长铺陈。对最关键的机制做 §6.3 敏感性扰动
+（移除载荷最大的证据 / 合并同源转载 / 切换有争议的编码 / 改用另一个评价主体或边界），
+输出须区分"结论稳健""依赖关键假设""证据不足以区分"——不得用一个综合置信分掩盖不同来源的不确定性。
+
+**同时做"为何尚未失败"的正向分析**：识别缓冲、冗余、非正式协作与成功偏离案例。
+修复一个缺陷前，先检查是否会破坏当前真正在维持系统的补偿机制。
 
 ### Stage 2: Seven-Dimensional Diagnostic Protocol
 
@@ -514,7 +708,12 @@ After scoring each dimension independently, discover how they interact through a
 
 #### Step 3-pre — Danger/Survival Zone Signature Check (automatic)
 
-Before the pair scan, run the seven scores through `detect_danger_zones()` (via `python3 -m agent.agent --danger-zones`). This mechanizes the Cross-Reference table at the end of `scoring-calibration.md`: a hit on a danger signature (e.g., D5≤2 + D2≤2 = the Enron/Theranos/FTX legitimacy-incentive collapse) must be named in the risk-node chapter and the executive summary; a survival-zone hit (e.g., D4≥4 + D6≥4 = anti-fragile core) feeds the evolution-scenario probabilities.
+Before the pair scan, run the seven scores through `detect_danger_zones()` (via `python3 -m agent.agent --danger-zones`). This mechanizes the Cross-Reference table at the end of `scoring-calibration.md`.
+
+**These signatures are hypotheses, not validated predictors.** They were induced after the fact from a
+handful of famous cases; the project has no validation sample, no base rate and no false-positive rate
+for them. A hit means *this mechanism is worth investigating* — write it into the report as a lead to
+test, never as a confirmed precursor of collapse, and never let it set a scenario probability on its own.
 
 #### Step 3a — Dimension Pair Scan
 
@@ -522,8 +721,8 @@ For each of the 21 dimension pairs (C(7,2)=21), ask:
 > "Does Di's current state amplify or suppress Dj's risk/health? Through what specific mechanism?"
 
 Classification:
-- **Strong**: Di changing 1 point would shift Dj by ≥0.5 points
-- **Weak**: Transmission mechanism exists but influence is uncertain or indirect
+- **Strong**: 有明确传导机制与可观察的中间变量；不把序数评分差当作效果量
+- **Weak**: 传导机制存在但证据不足、影响不确定或间接
 - **None**: No plausible transmission mechanism
 
 Record only Strong and Weak interactions (expect 5-12 meaningful pairs per analysis).
@@ -534,15 +733,31 @@ Encode the Strong/Weak interactions from Step 3a as causal edges and feed them t
 
 | Type | Definition | Danger Level |
 |------|-----------|-------------|
-| Vicious Cycle | Reinforcing loop + low scores or down-trajectory | High: exponential deterioration |
-| Virtuous Cycle | Reinforcing loop + high scores, no down-trajectory | Positive but may create fragile dependency |
+| Vicious Cycle | Reinforcing loop + 低分或下行线索 | 高优先级待检验风险，不推断恶化幅度或速度 |
+| Virtuous Cycle | Reinforcing loop + 高分且无下行线索 | 待检验的正向反馈，仍可能包含脆弱依赖 |
 | Antagonism | Balancing loop (odd number of negative edges) | Medium: improving one dimension may cost another |
+| Indeterminate | Reinforcing loop, but ≥1 dimension in it has no numeric score | Polarity is known; **direction and valence are not** |
+
+Polarity follows from edge signs alone. Whether a reinforcing loop is currently running *virtuous* or
+*vicious* depends on the state of **every** dimension in it — if any of them is `unknown`, the tool
+returns `indeterminate` and you must not call the loop good or bad. Reinforcing is not inherently
+harmful and balancing is not inherently beneficial.
 
 The analyst judges which edges exist and through what mechanism; the tool computes the logical consequences (closure, polarity, classification). Disagreement with tool output means a missing or mis-signed edge — fix the declaration, don't override the computation.
 
-#### Step 3c — Leverage Point Ranking (tool-computed)
+#### Step 3c — Structural Centrality Ranking (tool-computed) — *not* Meadows leverage
 
-The same `--causal` call returns `leverage_ranking`: loop-participation count as primary key, strength-weighted degree as tiebreaker (Meadows). The top leverage point should be the primary target for interventions in Stage 5 — and Stage 5's prescription spillover/conflict cross-check reuses the same causal graph via `prescription_check` (intervention propagation simulation).
+The same `--causal` call returns `leverage_ranking`: loop-participation count as primary key,
+strength-weighted degree as tiebreaker.
+
+**This is graph centrality, not a Meadows leverage level.** Meadows ranks *kinds* of intervention
+(parameters < information flows < rules < goals < paradigms); how many loops a node sits in says nothing
+about which kind you are performing. A central node means "changing it ripples widely" — it does **not**
+mean the change is feasible, cheap, or large in effect. Before promoting a central dimension to an
+intervention target, run the feasibility check in `references/methods/decision.md`: who holds the
+authority, what lead time is required, what is irreversible once started, and how the effect would be
+verified. The propagation numbers from `prescription_check` are unitless ordinal ripples (no delays, no
+thresholds, no time steps) — use them to compare direction and reach, never to promise a magnitude.
 
 #### Step 3d — Known Pattern Matching
 
@@ -576,8 +791,24 @@ After scoring all seven dimensions, match the current system's score vector agai
 
 **Historical case library:** `references/analogy-cases.json` — 51 cases across 7 system types (geopolitical, public_company, private_company, government_agency, market, platform, relational). The relational track covers multi-actor interaction systems: July Crisis 1914, Cuban Missile Crisis, US-USSR détente, Egypt-Israel cold peace, India-Pakistan, US-China trade war, Iran-Israel shadow war, Russia-NATO 2021.
 
+**Library provenance — read this before quoting an analogy.** The 51 cases are a **teaching**
+library: every score was coded *after* the outcome was known, by a coder who was not blinded to it,
+and the selection over-represents famous failures. The file now stores `as_of_known` and `hindsight`
+separately so replay evaluation can isolate outcomes (`find_analogies(..., blind=True)`), but that
+separation makes the contamination **visible and mechanically excludable** — it does not remove it
+from the existing scores. Never use this library as a validation set: it would prove hindsight with
+hindsight. Evaluation samples must be coded separately (see `evals/cases/`).
+
+**Coverage constraint (S0):** similarity is computed only over dimensions that actually have numeric
+scores. Fewer than 3 scored dimensions → **no analogies are returned** (insufficient input, and saying so
+is the correct output). Fewer than 6 → results are tagged `match_type: "partial"` with their `coverage`,
+and must be presented as a partial match on N/7 dimensions, never as a structural match. Without this,
+a single dimension was enough to give Enron, Theranos and FTX a similarity of 1.0 — low coverage
+masquerading as structural resemblance.
+
 **Interpretation rules:**
-- Analogies are heuristic, not predictive — "structurally similar to X" does not mean "will follow X's trajectory"
+- Analogies are heuristic, not predictive — "structurally similar to X" does not mean "will follow X's trajectory". They generate leads to test; they never produce a probability of occurrence.
+- Case scores were coded with the outcome already known (`outcome_is_hindsight: true`), and the library over-represents famous failures. Expect hindsight contamination and selection bias in both directions.
 - Always highlight key differences between the current system and the analogy (which dimensions diverge, and why those differences matter)
 - If top-3 analogies all share the same outcome direction (e.g., all collapsed), flag this as a structural warning signal
 - Present in the report between cross-dimensional analysis and risk node identification
@@ -596,19 +827,54 @@ For each node:
 
 ### Stage 5: Strategic Prescriptions & Evolution Scenarios
 
-#### 5.1 Natural Evolution Scenarios (if no intervention)
+#### 5.1 Conditional Scenarios (if no intervention)
 
-Project 3 scenarios over 1-3 years:
+**There is no default three-way split.** Heat death / violent bifurcation / emergence are discussion
+metaphors — they are not a mutually exclusive, exhaustive event set for every system, and reaching for
+them by default imposes a pathology frame on systems that may not warrant one.
 
-| Scenario | Probability | Description |
-|----------|------------|-------------|
-| **Thermodynamic equilibrium** (heat death) | ?% | Maximum entropy — system becomes inert, irrelevant |
-| **Violent bifurcation** (crisis/split) | ?% | Internal contradictions force a dramatic break |
-| **Self-organized phase transition** (emergence) | ?% | System finds a new attractor state through internal evolution |
+Build scenarios from **this system's** driving uncertainties: the main external shocks it is exposed to,
+the internal mechanisms identified in Stage 3, and the actions actually available. Two well-specified
+scenarios are better than three forced ones.
 
-Assign rough probabilities based on the diagnostic findings.
+**Probabilities are optional and conditional:**
+- Output probabilities summing to 100% **only** when the scenarios are mutually exclusive and exhaustive
+  over the same horizon **and** you can state the basis (`probability_basis`: base rate, model, expert
+  range). No basis → no number.
+- Otherwise present them as parallel conditional scenarios and label them explicitly
+  "not a probability distribution".
+- **Being unable to give a probability is a legitimate output.** Under deep uncertainty, prefer robust
+  actions — which choices remain defensible across scenarios — over a forced expected-value calculation.
+  See `references/methods/dynamics.md`.
 
-#### 5.2 Intervention Prescriptions
+#### 5.2 行动卡（`actions[]`）——建议必须能交给具体执行者
+
+"建议正确"不等于执行者有权限、预算或验证条件。每条行动填满以下字段，否则它是观察不是建议：
+
+| 字段 | 必须回答 |
+|---|---|
+| 行动与机制 | 具体改变什么，通过哪个机制（`mechanism_id`）改善哪项结果 |
+| 适用角色与权限 | 用户能直接做、能推动别人做，还是只能监测（不得超出 `analysis_contract.user_authority`） |
+| 最小下一步 | 第一个可交付动作、前置条件与完成定义 |
+| 资源与提前量 | 成本范围、人员、时间、依赖与不可逆投入 |
+| 替代项 | 维持现状 / 先补证 / 先试验 / 直接干预的取舍 |
+| 收益与受损方 | 不同主体的收益、成本、风险转移与阻力 |
+| 验证设计 | 基线、结果指标、对照或比较方法、观测窗口 |
+| 护栏与退出 | 副作用指标、停止条件、回滚或切换办法 |
+| 决策触发 | 什么新证据使它启动、延期、升级或取消 |
+
+**对外部观察者**（无干预权限）：输出"该关注什么、需要争取何种权限、哪些证据值得补查"，
+不默认其能改变组织薪酬、制度或国际关系。
+
+**用小型验证替代大而确定的处方**：主要机制尚未区分时，优先提出能低成本**区分机制**的
+试验或数据核查；不能试验时提出过程追踪、匹配案例或自然变化观察，并说明混杂限制。
+**不要求每条解释都产生立即干预**——有时最实用的结论是：现在不具备行动依据；
+继续保持某个缓冲；补齐一条决定性事实；或提前保留退出选项。
+
+**验证设计的两个陷阱**：① 用行动本身瞄准的那个指标去验证行动（指标迎合）；
+② 把局部改善当系统改善（风险转移）。尽量用**独立结果指标**、抽样审计与干预后的替代行为观察。
+
+#### 5.2b Intervention Prescriptions（旧结构，仍用于跨维溢出计算）
 
 Provide **3-5 high-leverage interventions**, ranked by:
 - **Impact**: How much system health improvement?
@@ -636,26 +902,46 @@ After annotating all prescriptions, perform a **cross-check**:
 
 #### 5.3 Monitoring Dashboard
 
-Suggest 3-5 leading indicators the user should watch to track whether the system is improving or deteriorating. For each indicator:
-- What to measure
-- How to measure it (practical method)
-- What threshold signals danger
-- What threshold signals health
+Suggest 3-5 leading indicators the user should watch. Each indicator must carry **all** of:
+measurement definition, data source, baseline, **where the threshold comes from**, observation frequency,
+false-positive handling, who owns it, and what action it triggers.
+
+If a threshold has no defensible source, mark it **"待校准"** — do not manufacture a red/amber/green
+light out of wording. An indicator without an owner and a triggered action is decoration.
+
+Critical-slowing-down signals (rising variance/autocorrelation before a transition) may be explored
+**only** with an adequate and suitable time series, stated preprocessing and model assumptions, and a
+false-positive rate measured against non-transition periods. The原始 research is explicit about the
+limits of detection — do not apply it to short news series.
 
 ## Output Format
 
-**Choose output mode based on user context:**
+**报告由同一份结构化记录生成，不是反过来。** analysis JSON 永远产出（它是审计链的载体）；
+Markdown 报告是它的可读视图。
 
 | Mode | When to use | Format |
 |------|------------|--------|
-| **Report** (default) | One-time analysis, sharing with others | Structured Chinese consulting report (below) |
-| **JSON** | Tracking over time, comparing systems, feeding into other tools | Fill `references/diagnostic-schema.json` schema, output as code block |
-| **Brief** | Quick read, time-constrained | Executive summary + 3 risk nodes + 3 prescriptions only |
+| **Report**（默认） | One-time analysis, sharing with others | `references/report-template.md` 骨架 |
+| **JSON** | Tracking over time, comparing systems, feeding into other tools | `references/diagnostic-schema.json`，输出为代码块 |
+| **Brief** | Quick read, time-constrained | 缩短叙述，不删关键证据、核心替代解释与行动条件 |
 | **Dual** | When user wants both | Report first, then JSON appendix |
 
-Ask the user which mode they want if not obvious from context.
+**推荐报告结构**（完整版见 `references/report-template.md`）：
 
-**Standard Report — Present the full analysis as a structured consulting report:**
+1. **决策摘要**——目前最重要的判断、建议动作、不确定性与适用边界
+2. **系统边界与目标**——分析对象、受影响主体、评价目标与截止时间
+3. **已知事实与未知**——关键证据、未决冲突、数据覆盖与口径限制
+4. **核心机制与替代解释**——通常深入 1-3 条机制
+5. **动态变化与条件未来**——延迟、阈值、可裁定预测、适应路径
+6. **行动卡**——执行者、验证、护栏、下一次决策触发条件
+7. **判断变更记录**——重复分析时列出新增、撤回和保留的判断
+8. **审计附录**——覆盖矩阵、断言—证据关系、方法假设、版本与来源
+
+章节标题可以结论前置，但证据不足时允许"尚不能区分需求下降与测量变化"这样的不确定判断。
+读者应能沿一条主张追溯到**具体摘录**，而不是只能找到文末的来源列表。
+
+<details>
+<summary>旧版七维顺序报告模板（保留供对照，不再是默认）</summary>
 
 ```
 《[System Name]: 系统演化与底层病理诊断报告》
@@ -702,6 +988,8 @@ Ask the user which mode they want if not obvious from context.
 
 > **注：上面模板里的章节名（"系统制图""七维诊断矩阵""战略演化沙盘"等）是结构槽位，不是最终标题。** 实际渲染时每个章节标题都必须改写成判断句（"市场分析"→"该市场正在向高端化集中"），首句即结论，全文反顾问腔/AI腔。完整规范见 `agent/prompts/system.md`「输出格式：分层阅读设计」节。
 
+</details>
+
 ## Analysis Quality Standards
 
 - **Precision over comprehensiveness**: Better to deeply nail 3 insights than superficially cover 20
@@ -730,23 +1018,82 @@ If the user asks to compare two systems, use the same seven-dimensional framewor
 
 3. **预测汇编（Step 5.5）**：收集全部候选预测（预期 4-9 条），筛选最终 3-5 条：
    - 覆盖至少 3 个不同维度
-   - 包含高置信（≥0.8）和低置信（≤0.3）的分布
    - 优先保留跨维度预测（诊断价值更高）
    - 被筛掉的候选存入 JSON `candidate_predictions` 字段备查
+   - **不设置置信度配比要求。** 此前要求"必须同时包含 ≥0.8 与 ≤0.3 的预测"——那是让概率服务于
+     排版和表现形式。概率只表达判断：如果这次诊断的所有可靠推论恰好都落在 0.5-0.7，就如实这么写。
+   - **预测题目的生成与筛选规则须冻结**：先定筛选标准再选题，防止只挑容易裁定的题目刷成绩。
 
 当对同一系统进行重复分析时（Step 3.6），自动加载上次预测并派发 `prediction_verification` Researcher 验证。验证结果通过 `calculate_prediction_accuracy()` 计算校准分数（Brier score），在 Research Brief 中展示。
 
+### 变化的四种类型（重复分析时先分类，再更新）
+
+| 变化类型 | 例子 | 应如何更新 |
+|---|---|---|
+| **系统状态变化** | 库存下降、退出率增加 | 更新变量与相关判断 |
+| **机制变化** | 奖励规则改变、决策权转移 | 重审相关机制与行动建议 |
+| **观测变化** | 指标口径改变、披露制度调整 | **先检查可比性**——不可直接解释为系统变化 |
+| **分析修正** | 原文误读被纠正、证据被撤回 | 撤销依赖判断并保留修订记录 |
+
+数据至少记录 `event_time` / `published_at` / `retrieved_at` / `valid_from`-`valid_to` / `as_of`。
+**未知时间显式留空，不能用检索日期替代事件日期**——`check_time_fields()` 会拦下
+"event_time 等于 retrieved_at 且无 published_at"这种痕迹（不知道就填了今天）。
+
+**时效按断言类型管理**（`CLAIM_TYPE_STALENESS`），不是所有材料按同一个"两天"或"六个月"阈值：
+
+| `claim_type` | 阈值 | 为什么 |
+|---|---|---|
+| `market_price` | 1 天 | 价格类数据当日即失效 |
+| `crisis_status` | 2 天 | 危机按小时演进 |
+| `officeholder` / `operational_status` | 7 天 | 任免与停运可以在一天内发生 |
+| `policy_in_force` | 90 天 | 生效状态变化慢，但须检查修订 |
+| `financial_period` / `statistical_series` | 120 / 180 天 | 关键是期次与修订版本，不是天数 |
+| `charter_rule` / `structural_fact` | 730 / 365 天 | 变化缓慢 |
+| `historical_fact` | 不按时间过期 | 只在新证据出现时复查 |
+
+无时间锚点的断言标 `no_anchor`——**不得默认它还新鲜**。
+
+**新报道不等于新事实**：只在事实、机制、预测或行动状态发生变化时才形成更新条目；
+转载不增信（`is_republication()` 按 `source_family` / `event_time` 识别重发，只更新访问记录）。
+
+**口径变了就不可直接比较**：`comparability()` 比对两期的 `dimension_basis_version` 与
+登记的 `measurement_changes`；口径已变却出现数值改善时，明确拒绝"读作系统改善"的解释。
+`diff_analyses()` 把每条变化归入四类之一，`measurement` 与 `analysis_correction`
+不得混进 `system_state`。
+
+**预测冻结**：`freeze_predictions()` 拒绝覆盖已登记的 id；改概率走 `update_prediction()`
+追加新版本，初始值永远保留。复盘取版本的策略（`first` / `lead_time`）必须
+**在看到结果之前**声明，否则就是事后挑最准的那一版。
+
 **预测要求：**
-- 必填字段：`prediction`、`falsification_condition`（required）、`time_horizon`（绝对日期）、`confidence`（0.0-1.0）、`dimension_link`（D1-D7）、`source_step`（`dimension_analysis` | `cross_dimensional`）
+- 必填字段：`prediction`、`falsification_condition`、`time_horizon`（绝对日期）、`confidence`（0.0-1.0）、
+  `dimension_link`（D1-D7）、`source_step`、**`event_type`**
 - 禁止模糊预测和必然预测——必须可观察、可证伪
 - 高置信（≥0.8）预测落空会被 `high_confidence_misses` 标记为特别警示
+- **登记即冻结**：事件定义、概率、生成时间、目标窗口、时区、裁定来源优先级、缺数据处理、
+  关联机制一并冻结（`frozen_at` / `version`）。更新概率产生**新版本**，不覆盖初始值；
+  复盘时预先选定"首次预测"或固定提前量快照，防止事后挑最准的版本。
+
+**⏳ 事件语义决定裁定规则（S0，取代旧的单一"时序铁律"）：**
+
+| `event_type` | 提前判成立 | 提前判不成立 |
+|---|---|---|
+| `occurrence`（截止日前至少发生一次） | 可——事件已被充分证据确认 | 否；除非预先定义且已证实的不可能条件（`impossibility_established`） |
+| `persistence`（持续到截止日） | 否，到期才能确认 | 可——窗口内出现明确破坏 |
+| `point_in_time`（截止日的状态或数值） | 否，等目标时点与数据发布 | 否——不因中途波动提前否定 |
+| `conditional`（条件预测） | 先确认触发条件，再按约定窗口裁定 | 触发未发生标 `not_activated`，**不计入失败率** |
+
+未声明 `event_type` 时按最保守规则处理（两个方向都不提前裁定）并给出 flag。
+不合法的提前裁定一律降级为未决，不计入 Brier。
+此前本工具只实现了 persistence 一种语义：`falsified` 在任何时候都被计分——
+于是三条"2099 年前发生"的预测在 2026 年就被算出 Brier 0.64。
 
 **校准指标：**
-- Brier score（置信度加权，**仅在真正到期裁定的预测 ≥3 条时计算**）
-- 高置信落空率（高于低置信落空更值得关注）
-- 命中率（raw accuracy，仅作参考）
-
-**⏳ 时序铁律（P6a）：** 一条"X 持续到 time_horizon"的预测，**到期前不可能判 confirmed**（在 D 之前随时还能破），只能 `falsified`（已破）/ `on_track`（一致但未到期）/ `pending`。`calculate_prediction_accuracy(as_of_date=...)` 会把窗口未到的 confirmed 自动降级为 on_track、**不计入 Brier**——杜绝用未到期预测刷出虚假校准（曾把 5 条全未到期的预测算出"命中率 100%/Brier 0.098"的假象）。
+- Brier score，标准二元形式 `mean((p - y)^2)`，**仅在真正到期裁定的预测 ≥3 条时计算**
+- 同时报告：样本数、未决比例、**同样本基准（基础率）Brier 与差值**、按事件类型分组
+- 高置信落空率（高于低置信落空更值得关注）；命中率（raw accuracy，仅作参考）
+- **少量预测的低 Brier 不能证明校准好。** 工具在已裁定样本 <30 条时会明确 flag：
+  至少累计 30 条跨系统已裁定事件后才做首次探索性汇总，且那仍不保证统计结论可靠。
 
 ---
 
@@ -761,7 +1108,17 @@ After presenting the initial report, offer the user options:
 
 ## Theoretical Toolkit Reference
 
-Keep these in your analytical arsenal — use them where they illuminate, not as decoration:
+**理论分层（决定一个理论能产出什么资格的输出）：**
+
+| 层级 | 用途 | 输出资格 |
+|---|---|---|
+| 形式化理论与方法（因果推断、适当评分规则、控制论的形式部分） | 提供变量、约束、识别条件或评分规则 | 条件满足时给定量结果；**条件不满足时须明说不能识别或不能估计** |
+| 中层机制解释（委托代理、信息过滤、协调失败、反馈延迟） | 解释具体过程 | 给机制**假说**与竞争解释；须有对象证据——理论存在不等于机制存在 |
+| 启发式与历史类比 | 提供问题、参照物、可能机制 | 只生成**待验证线索**，不直接产生发生概率 |
+| 哲学与修辞隐喻（熵增、相变、有限/无限游戏、反脆弱） | 帮助理解战略取向或表达 | **不作为**评分、因果关系、阈值和预测概率的独立依据 |
+
+没有状态变量、边界条件和模型证据时，"熵增""相变""反脆弱"只能当启发性语言用。
+下表按此分层使用——用在它照亮的地方，不做装饰：
 
 | Theory | Core Insight | Best Applied To |
 |--------|-------------|----------------|
@@ -775,7 +1132,12 @@ Keep these in your analytical arsenal — use them where they illuminate, not as
 | Hirschman (Exit, Voice, Loyalty) | Members respond to decline by leaving, complaining, or staying loyal | Talent retention, stakeholder management |
 | Christensen (Innovator's Dilemma) | Incumbents fail by doing everything "right" for current customers | Disruption risk, innovation strategy |
 | Perrow (Normal Accidents) | Tight coupling + complexity = inevitable accidents | Safety, system architecture, risk |
-| Meadows (Leverage Points) | Not all intervention points are equal; highest leverage is often counterintuitive | Where to intervene in a system |
+| Meadows (Leverage Points) | Not all intervention points are equal; highest leverage is often counterintuitive | Where to intervene in a system — the ranking is over **kinds** of intervention (parameters < information flows < rules < goals < paradigms), never over graph centrality |
+
+**每个理论都要说明何时不能用。** 常见越界：把回路数量当 Meadows 杠杆等级；用画图代替因果识别；
+把"尚未排除"写成"已证实"；在没有状态空间和模型时宣称严格的可观测性/可控性；
+用少量预测的低 Brier 声称校准良好。方法卡（问题 → 假设 → 观测 → 推论 → 反证 → 行动 → 适用限制）
+见 `references/methods/`。
 
 ## Language
 

@@ -8,6 +8,7 @@ Obsidian 导出（MD 素材 + HTML 报告）：
 
 import json
 import math
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -18,6 +19,44 @@ DATA_DIR = Path.home() / '.system_pathology' / 'data'
 _VALID_DIMS = {'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7'}
 _VALID_SOURCE_STEPS = {'dimension_analysis', 'cross_dimensional'}
 _DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+_URL_RE = re.compile(r'^https?://\S+$', re.IGNORECASE)
+
+# 非数值评分（S0）：缺资料写 unknown，不适用写 not_applicable。
+# 二者都不得用中间分 3 填补——那是把"不知道"伪装成"中等健康"。
+_NON_NUMERIC_SCORES = {'unknown', 'not_applicable'}
+
+# 事件语义（S0）：预测的裁定规则由类型决定，见 history_compare._EARLY_ADJUDICATION
+_VALID_EVENT_TYPES = {'occurrence', 'persistence', 'point_in_time', 'conditional'}
+
+# 报告完整性状态（S0/§9.4）：与"知识不确定性"分开记录。
+# 不存在"流程完成＝事实真实"的状态——complete_with_uncertainty 只表示约定分析工作完成。
+COMPLETENESS_STATES = ('draft', 'partial', 'complete_with_uncertainty')
+
+_VALID_VERIFICATION_STATUS = {'confirmed', 'dead', 'mismatch', 'unverifiable', 'unchecked'}
+
+
+def _is_valid_url(u) -> bool:
+    return bool(isinstance(u, str) and _URL_RE.match(u.strip()))
+
+
+def claims_ledger(analysis: dict) -> list:
+    """
+    取断言账本：S1 的 `claims[]` 优先，回落到旧字段 `key_claims`。
+
+    两者是同一账本的新旧形态——旧记录用 `key_claims`，新契约用带 id 与来源血缘的 `claims`。
+    读取时统一，避免升级后老记录被误判为"没建账本"。
+    """
+    for field in ('claims', 'key_claims'):
+        items = analysis.get(field)
+        if isinstance(items, list) and items:
+            return items
+    return []
+
+
+def numeric_scores(scores: dict | None) -> dict:
+    """只取可参与计算的数值评分；unknown / not_applicable 一律排除。"""
+    return {k: v for k, v in (scores or {}).items()
+            if isinstance(v, (int, float)) and not isinstance(v, bool)}
 
 
 def _validate_predictions(preds, field_name: str) -> list[str]:
@@ -56,6 +95,18 @@ def _validate_predictions(preds, field_name: str) -> list[str]:
         dl = p.get('dimension_link')
         if dl is not None and dl not in _VALID_DIMS:
             errors.append(f'{tag}.dimension_link 必须是 D1-D7，实际为 "{dl}"')
+
+        # S0：事件语义决定裁定规则——缺了它，"提前判对/提前判错"的合法条件无从区分
+        et = p.get('event_type')
+        if et is None:
+            errors.append(
+                f'{tag} 缺少 `event_type`（{sorted(_VALID_EVENT_TYPES)}）——'
+                f'不声明事件类型就无法定义合法的裁定窗口'
+            )
+        elif et not in _VALID_EVENT_TYPES:
+            errors.append(
+                f'{tag}.event_type 必须是 {sorted(_VALID_EVENT_TYPES)} 之一，实际为 {et!r}'
+            )
 
         ss = p.get('source_step')
         if ss is not None and ss not in _VALID_SOURCE_STEPS:
@@ -103,7 +154,14 @@ def validate_analysis(analysis: dict) -> list[str]:
         for dim, val in scores.items():
             if dim not in _VALID_DIMS:
                 continue
-            if not isinstance(val, (int, float)) or isinstance(val, bool):
+            if isinstance(val, str):
+                # S0：无法识别时不评分——只接受这两个显式标记，不接受自由文本
+                if val not in _NON_NUMERIC_SCORES:
+                    errors.append(
+                        f'dimension_scores.{dim} 只能是 1-5 数字，或 '
+                        f'{sorted(_NON_NUMERIC_SCORES)} 之一，实际为 {val!r}'
+                    )
+            elif not isinstance(val, (int, float)) or isinstance(val, bool):
                 errors.append(f'dimension_scores.{dim} 必须是数字，实际为 {val!r}')
             elif not (1 <= val <= 5):
                 errors.append(f'dimension_scores.{dim} 必须在 1-5 区间，实际为 {val}')
@@ -120,14 +178,15 @@ def validate_analysis(analysis: dict) -> list[str]:
     if 'candidate_predictions' in analysis:
         errors.extend(_validate_predictions(analysis['candidate_predictions'], 'candidate_predictions'))
 
-    # P3：dimension_evidence 当存在时严格校验——每个有评分的维度须挂 ≥1 条带 url 的信源
+    # P3：dimension_evidence 当存在时严格校验——每个**有数值评分**的维度须挂 ≥1 条带合法 url 的信源。
+    # unknown / not_applicable 的维度不要求证据（本来就没有可支撑的判断）。
     dim_ev = analysis.get('dimension_evidence')
     if dim_ev is not None:
         if not isinstance(dim_ev, dict):
             errors.append(f'dimension_evidence 必须是对象，实际为 {type(dim_ev).__name__}')
         elif isinstance(scores, dict) and scores:
-            for dim in scores:
-                if dim not in _VALID_DIMS:
+            for dim, val in scores.items():
+                if dim not in _VALID_DIMS or val in _NON_NUMERIC_SCORES:
                     continue
                 items = dim_ev.get(dim)
                 if not items or not isinstance(items, list):
@@ -135,8 +194,98 @@ def validate_analysis(analysis: dict) -> list[str]:
                     continue
                 if not any(isinstance(it, dict) and it.get('url') for it in items):
                     errors.append(f'dimension_evidence.{dim} 无任何带 url 的信源（评分须可追溯）')
+                    continue
+                # S0：URL 只做真值检查不足以约束有效证据——`"url": "x"` 曾能通过全部校验
+                if not any(isinstance(it, dict) and _is_valid_url(it.get('url')) for it in items):
+                    bad = [it.get('url') for it in items if isinstance(it, dict)]
+                    errors.append(
+                        f'dimension_evidence.{dim} 的 url 不是可核验的 http(s) 地址：{bad}'
+                        f'（评分须可追溯到能打开的具体条目）'
+                    )
+
+    # S0：信源核验记录须是可核验的记录，不能是占位对象（`[{}]` 曾能冒充"已核验"）
+    sv = analysis.get('source_verification')
+    if sv is not None:
+        if not isinstance(sv, list):
+            errors.append(f'source_verification 必须是数组，实际为 {type(sv).__name__}')
+        else:
+            for i, v in enumerate(sv):
+                if not isinstance(v, dict):
+                    errors.append(f'source_verification[{i}] 必须是对象')
+                    continue
+                if not _is_valid_url(v.get('url')):
+                    errors.append(
+                        f'source_verification[{i}].url 缺失或非 http(s) 地址：{v.get("url")!r}'
+                    )
+                st = str(v.get('status', '')).lower()
+                if st not in _VALID_VERIFICATION_STATUS:
+                    errors.append(
+                        f'source_verification[{i}].status 必须是 '
+                        f'{sorted(_VALID_VERIFICATION_STATUS)} 之一，实际为 {v.get("status")!r}'
+                    )
+
+    # S0：报告完整性状态由统一契约约束——不得自称完整却缺流程实据
+    completeness = analysis.get('completeness')
+    if completeness is not None:
+        if completeness not in COMPLETENESS_STATES:
+            errors.append(
+                f'completeness 必须是 {list(COMPLETENESS_STATES)} 之一，实际为 {completeness!r}'
+            )
+        elif completeness == 'complete_with_uncertainty':
+            derived = derive_completeness(analysis)
+            if derived != 'complete_with_uncertainty':
+                errors.append(
+                    f'completeness 声明为 complete_with_uncertainty，但按流程实据只能达到 '
+                    f'`{derived}`：{"；".join(completeness_blockers(analysis))}。'
+                    f'草稿可以保存——把 completeness 改成 `{derived}` 即可落盘'
+                )
 
     return errors
+
+
+def completeness_blockers(analysis: dict) -> list[str]:
+    """列出阻止本次分析达到 `complete_with_uncertainty` 的具体缺口（空列表 = 无阻塞）。"""
+    blockers: list[str] = []
+    scores = analysis.get('dimension_scores') or {}
+    pm = analysis.get('process_metadata')
+    mode = analysis.get('output_mode', 'full')
+
+    if not numeric_scores(scores) and not any(v in _NON_NUMERIC_SCORES for v in scores.values()):
+        blockers.append('无任何维度结论')
+    if not isinstance(pm, dict):
+        blockers.append('缺 process_metadata（无法核查流程门控是否执行）')
+        return blockers
+    if mode == 'full' and pm.get('ach_run') is not True:
+        blockers.append('full 模式未运行 ACH（竞争假说检验）')
+    if pm.get('round2_triggered') and not pm.get('round2_run'):
+        blockers.append('Round 2 已触发但未运行')
+    if not pm.get('source_verification_done'):
+        blockers.append('信源核验门控未执行')
+    else:
+        sv = analysis.get('source_verification')
+        if not isinstance(sv, list) or not any(
+                isinstance(v, dict) and _is_valid_url(v.get('url')) for v in sv):
+            blockers.append('声称已做信源核验但无可核验的 source_verification 记录')
+    if analysis.get('dimension_evidence') is None:
+        blockers.append('缺 dimension_evidence（各维度评分未挂可追溯信源）')
+    if not claims_ledger(analysis) and mode == 'full':
+        blockers.append('缺 key_claims 账本（载荷性断言未登记，无法做独立复核）')
+    return blockers
+
+
+def derive_completeness(analysis: dict) -> str:
+    """
+    按流程实据推导报告完整性状态（`draft` / `partial` / `complete_with_uncertainty`）。
+
+    与"知识不确定性"分开：本函数只回答"约定的分析工作做完了没有"，
+    不回答"结论是否为真"。缺口多寡决定 draft 还是 partial。
+    """
+    blockers = completeness_blockers(analysis)
+    if not blockers:
+        return 'complete_with_uncertainty'
+    if not numeric_scores(analysis.get('dimension_scores') or {}) or len(blockers) >= 4:
+        return 'draft'
+    return 'partial'
 
 
 def process_warnings(analysis: dict) -> list[str]:
@@ -162,17 +311,19 @@ def process_warnings(analysis: dict) -> list[str]:
         warnings.append('⚠️ 缺 dimension_evidence：各维度评分未挂可追溯信源（P3，建议补记以保证可审计）')
 
     # 关键断言账本（啃综述类错误）——同样置于 pm 早返回之前
-    kc = analysis.get('key_claims')
-    if kc is None and isinstance(scores, dict) and scores and analysis.get('output_mode', 'full') == 'full':
+    kc = claims_ledger(analysis)
+    if (not kc) and isinstance(scores, dict) and scores and analysis.get('output_mode', 'full') == 'full':
         warnings.append('⚠️ 缺 key_claims 账本：未登记载荷性事实断言，无法分诊"综述类错误"（Zolghadr 类）做独立复核')
     elif isinstance(kc, list):
         for c in kc:
             if not isinstance(c, dict) or not c.get('loads'):
                 continue
             ic = c.get('independent_check')
-            status = str(ic.get('status', '')).lower() if isinstance(ic, dict) else ''
+            # 新契约的 claims[].status 与旧字段的 independent_check.status 都算数
+            status = str(c.get('status') or
+                         (ic.get('status', '') if isinstance(ic, dict) else '')).lower()
             thin = _distinct_source_count(c.get('sources')) < 2 or _best_tier(c.get('sources')) == 3
-            short = (c.get('claim', '') or '')[:24]
+            short = (c.get('claim') or c.get('statement') or '')[:24]
             if status == 'contradicted':
                 warnings.append(
                     f'🛑 独立复核推翻了载荷性断言「{short}…」——依赖它的 {c.get("loads")} 须修订或撤下'
@@ -230,6 +381,15 @@ def process_warnings(analysis: dict) -> list[str]:
     if pm.get('breaking_event_sweep_done') is False:
         warnings.append('⚠️ 未做突发事件扫描（定稿前未查"今天/过去 24-48 小时"重大事件）——可能漏掉改写诊断的最新进展')
 
+    # S0：完整性状态显式化。未声明时按流程实据推导并点名，避免不完整研究以完整形态保存。
+    declared = analysis.get('completeness')
+    derived = derive_completeness(analysis)
+    if declared is None and derived != 'complete_with_uncertainty':
+        warnings.append(
+            f'⚠️ 未声明 completeness：按流程实据本次只能算 `{derived}`——'
+            f'{"；".join(completeness_blockers(analysis))}'
+        )
+
     return warnings
 
 
@@ -246,7 +406,12 @@ def _parse_date(s):
         return None
 
 
-OBSIDIAN_DIR = Path('/Users/na/Library/Mobile Documents/iCloud~md~obsidian/Documents/System Pathology')
+# 报告输出目录。S0：取消个人 Obsidian 路径作为唯一出口——
+# 环境变量 SYSTEM_XRAY_OUTPUT_DIR 优先，未设置时才回落到默认 Obsidian 仓库。
+_DEFAULT_OUTPUT_DIR = Path(
+    '/Users/na/Library/Mobile Documents/iCloud~md~obsidian/Documents/System Pathology')
+OBSIDIAN_DIR = Path(os.environ['SYSTEM_XRAY_OUTPUT_DIR']) \
+    if os.environ.get('SYSTEM_XRAY_OUTPUT_DIR') else _DEFAULT_OUTPUT_DIR
 
 
 def _system_dir(system_name: str) -> Path:
@@ -254,12 +419,102 @@ def _system_dir(system_name: str) -> Path:
     return DATA_DIR / safe
 
 
+_INDEX_NAME = 'index.json'
+# 版本文件名：{YYYYMMDD}-{NNN}.json。旧的 {YYYYMMDD}.json 仍可读，
+# 且按字符串排序时恰好排在同日各版本之前，视作该日的第 000 版。
+_VERSION_RE = re.compile(r'^(\d{8})-(\d{3})\.json$')
+_LEGACY_RE = re.compile(r'^(\d{8})\.json$')
+
+
+def _version_files(system_dir: Path) -> list[Path]:
+    """按 (日期, 序号) 升序返回该系统的全部分析文件，含 legacy 单日文件。"""
+    if not system_dir.exists():
+        return []
+    out: list[tuple[str, int, Path]] = []
+    for f in system_dir.glob('*.json'):
+        if f.name == _INDEX_NAME:
+            continue
+        m = _VERSION_RE.match(f.name)
+        if m:
+            out.append((m.group(1), int(m.group(2)), f))
+            continue
+        m = _LEGACY_RE.match(f.name)
+        if m:
+            out.append((m.group(1), 0, f))
+    out.sort(key=lambda t: (t[0], t[1]))
+    return [t[2] for t in out]
+
+
+def _next_analysis_id(system_dir: Path, date_str: str) -> str:
+    """同日已有 N 个版本 → 返回第 N+1 个 id。绝不复用已存在的 id。"""
+    used = {0} if (system_dir / f'{date_str}.json').exists() else set()
+    for f in system_dir.glob(f'{date_str}-*.json'):
+        m = _VERSION_RE.match(f.name)
+        if m:
+            used.add(int(m.group(2)))
+    seq = 1
+    while seq in used:
+        seq += 1
+    return f'{date_str}-{seq:03d}'
+
+
+def _reserve_analysis_file(system_dir: Path, date_str: str) -> tuple[str, Path, int]:
+    """用 O_EXCL 预留版本文件，避免并发调用取得同一个 sequence 后互相覆盖。"""
+    for _ in range(10000):
+        analysis_id = _next_analysis_id(system_dir, date_str)
+        filepath = system_dir / f'{analysis_id}.json'
+        try:
+            fd = os.open(filepath, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            return analysis_id, filepath, fd
+        except FileExistsError:
+            continue
+    raise RuntimeError(f'无法为 {date_str} 分配唯一分析版本号')
+
+
+def _rebuild_index(system_dir: Path) -> dict:
+    """
+    重建 index.json。
+
+    索引是**派生物**：删掉它可以从版本文件完整重建，因此它不是真相来源，
+    也不覆盖任何历史——`latest` 只是一个指针。
+    """
+    entries = []
+    for f in _version_files(system_dir):
+        try:
+            data = json.loads(f.read_text())
+        except json.JSONDecodeError:
+            continue
+        entries.append({
+            'analysis_id':   data.get('analysis_id') or f.stem,
+            'analysis_date': data.get('analysis_date'),
+            'saved_at':      data.get('saved_at'),
+            'completeness':  data.get('completeness'),
+            'overall_score': data.get('overall_score'),
+            'output_mode':   data.get('output_mode', 'full'),
+            'supersedes':    data.get('supersedes'),
+            'file':          f.name,
+        })
+    index = {
+        'versions': entries,
+        'latest': entries[-1]['analysis_id'] if entries else None,
+        'note': 'latest 只是指针；版本文件不可变，历史不被覆盖。本索引可从版本文件重建。',
+    }
+    (system_dir / _INDEX_NAME).write_text(
+        json.dumps(index, ensure_ascii=False, indent=2), encoding='utf-8')
+    return index
+
+
 def save_analysis(
     system_name: str, system_type: str, analysis: dict,
     date_str: str | None = None, validate: bool = True,
 ) -> str:
     """
-    保存分析结果，返回文件路径。
+    保存分析结果为**不可变版本**，返回文件路径。
+
+    S2 变更：此前按 `{YYYYMMDD}.json` 命名，同一天做两次分析后一次会**静默覆盖**前一次——
+    跨期对比因此可能拿旧版跟自己比，纠错记录也无处可查。现在每次保存产生一个新版本
+    `{YYYYMMDD}-{NNN}.json`，带唯一 `analysis_id`，并记录它 `supersedes` 哪一版。
+    `index.json` 只是可重建的指针索引，不承载历史。
 
     analysis 应包含字段：
       dimension_scores: {D1: float, D2: float, ...}
@@ -272,48 +527,141 @@ def save_analysis(
     validate=True（默认）时，落盘前调用 validate_analysis() 校验结构；不合法则
     抛 ValueError 并附完整错误清单，避免污染数据持久化。测试可传 validate=False 绕过。
     """
+    if date_str is None:
+        date_str = datetime.now().strftime('%Y%m%d')
+
     if validate:
         errors = validate_analysis(analysis)
+        # 新契约对象存在时，不能绕过对象层、血缘与行动约束直接落盘。
+        # 延迟导入避免 validation -> db 的模块循环；旧记录保持原有兼容路径。
+        if any(k in analysis for k in ('claims', 'mechanisms', 'actions',
+                                       'analysis_contract', 'coverage_audit')):
+            from agent.validation import validate_contract
+            contract_errors, _ = validate_contract(analysis)
+            errors = contract_errors
         if errors:
             raise ValueError(
                 'analysis 结构校验失败，已拒绝持久化：\n  - ' + '\n  - '.join(errors)
             )
 
-    if date_str is None:
-        date_str = datetime.now().strftime('%Y%m%d')
-
     system_dir = _system_dir(system_name)
     system_dir.mkdir(parents=True, exist_ok=True)
 
-    filepath = system_dir / f'{date_str}.json'
+    previous = _version_files(system_dir)
+    supersedes, previous_record = None, {}
+    if previous:
+        try:
+            prev = json.loads(previous[-1].read_text())
+            previous_record = prev
+            supersedes = prev.get('analysis_id') or previous[-1].stem
+        except json.JSONDecodeError:
+            supersedes = previous[-1].stem
+
+    # S2 主路径：新预测在第一次保存时冻结，后续概率调整只能通过追加版本。
+    # 没有稳定 id 的旧 predictions 保持兼容读取，但不能被当作登记册的新增条目。
+    prediction_registry = list(previous_record.get('prediction_registry') or [])
+    incoming_predictions = analysis.get('predictions') or []
+    registry_errors = []
+    if incoming_predictions and all(isinstance(p, dict) and p.get('id') for p in incoming_predictions):
+        from agent.tools.forecast_registry import freeze_predictions
+        frozen = freeze_predictions(incoming_predictions, frozen_at=date_str,
+                                    registry=prediction_registry)
+        prediction_registry, registry_errors = frozen['registry'], frozen['errors']
+    if analysis.get('prediction_updates'):
+        from agent.tools.forecast_registry import update_prediction
+        for update in analysis.get('prediction_updates') or []:
+            if not isinstance(update, dict):
+                registry_errors.append('prediction_updates 条目必须是对象')
+                continue
+            changed = update_prediction(prediction_registry, update.get('id'),
+                                        update.get('updates') or {}, date_str,
+                                        update.get('reason', ''))
+            prediction_registry, errors = changed['registry'], changed['errors']
+            registry_errors += errors
+    if registry_errors:
+        raise ValueError('预测登记失败，已拒绝持久化：\n  - ' + '\n  - '.join(registry_errors))
+
+    analysis_id, filepath, fd = _reserve_analysis_file(system_dir, date_str)
+
+    # S0：系统元数据由调用方参数决定，**不允许被 analysis 输入覆盖**。
+    # 此前 `**analysis` 展开在后，一份 analysis 里写个 analysis_date 就能改写生成元数据。
     record = {
+        **analysis,
         'system_name':   system_name,
         'system_type':   system_type,
         'analysis_date': date_str,
+        'analysis_id':   analysis_id,
+        'supersedes':    supersedes,
         'saved_at':      datetime.now().isoformat(),
-        **analysis,
+        'completeness':  analysis.get('completeness') or derive_completeness(analysis),
     }
-    filepath.write_text(json.dumps(record, ensure_ascii=False, indent=2))
+    if prediction_registry:
+        record['prediction_registry'] = prediction_registry
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(record, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+    except Exception:
+        filepath.unlink(missing_ok=True)
+        raise
+    _rebuild_index(system_dir)
     return str(filepath)
 
 
-def load_latest(system_name: str) -> dict | None:
-    """加载最近一次分析结果。"""
+def load_version(system_name: str, analysis_id: str) -> dict | None:
+    """按 analysis_id 重建当时的输入、判断与预测（版本不可变，故可精确重建）。"""
+    system_dir = _system_dir(system_name)
+    for f in _version_files(system_dir):
+        if f.stem == analysis_id:
+            return json.loads(f.read_text())
+        try:
+            data = json.loads(f.read_text())
+        except json.JSONDecodeError:
+            continue
+        if data.get('analysis_id') == analysis_id:
+            return data
+    return None
+
+
+def list_versions(system_name: str) -> list[dict]:
+    """列出全部不可变版本（升序）。索引缺失时从版本文件重建。"""
     system_dir = _system_dir(system_name)
     if not system_dir.exists():
-        return None
-    files = sorted(system_dir.glob('*.json'), reverse=True)
+        return []
+    index_path = system_dir / _INDEX_NAME
+    if not index_path.exists():
+        return _rebuild_index(system_dir)['versions']
+    try:
+        return json.loads(index_path.read_text()).get('versions', [])
+    except json.JSONDecodeError:
+        return _rebuild_index(system_dir)['versions']
+
+
+def load_latest(system_name: str) -> dict | None:
+    """
+    加载最近一次分析结果（最新版本）。
+
+    注意排序用的是 (日期, 版本序号) 而不是文件名字符串——`index.json` 与
+    未来可能出现的其他文件不得混进来当成分析记录。
+    """
+    files = _version_files(_system_dir(system_name))
     if not files:
         return None
-    return json.loads(files[0].read_text())
+    return json.loads(files[-1].read_text())
 
 
 def load_analysis(system_name: str, date_str: str) -> dict | None:
-    """加载指定日期的分析结果。"""
-    filepath = _system_dir(system_name) / f'{date_str}.json'
-    if not filepath.exists():
+    """
+    加载指定日期的分析结果；同日有多个版本时返回**该日最后一个**版本。
+
+    要精确定位某一版，用 `load_version(system_name, analysis_id)`。
+    """
+    system_dir = _system_dir(system_name)
+    same_day = [f for f in _version_files(system_dir) if f.name.startswith(date_str)]
+    if not same_day:
         return None
-    return json.loads(filepath.read_text())
+    return json.loads(same_day[-1].read_text())
 
 
 def load_predictions(system_name: str) -> list[dict]:
@@ -325,6 +673,10 @@ def load_predictions(system_name: str) -> list[dict]:
     latest = load_latest(system_name)
     if latest is None:
         return []
+    registry = latest.get('prediction_registry')
+    if registry:
+        from agent.tools.forecast_registry import select_versions
+        return select_versions(registry, policy='first')['selected']
     return latest.get('predictions', [])
 
 
@@ -928,6 +1280,10 @@ def build_radar_svg(scores: dict[str, int | float], size: int = 380) -> str:
     scores: {'D1': 3, 'D2': 4, ..., 'Dn': v}
     返回可直接嵌入 <div class="radar-container"> 的 SVG 字符串。
     """
+    # unknown / not_applicable 不进雷达图：没有分数就没有顶点，不用中性 3 顶上去
+    scores = numeric_scores(scores)
+    if not scores:
+        return '<!-- 无数值维度评分，未生成雷达图 -->'
     cx, cy = size / 2, size / 2
     r_max = size / 2 - 50
     n = len(scores)
@@ -1053,18 +1409,17 @@ def save_html_report(
 
 
 def list_analyses(system_name: str) -> list[dict]:
-    """列出该系统的所有历史分析记录摘要（按日期倒序）。"""
-    system_dir = _system_dir(system_name)
-    if not system_dir.exists():
-        return []
+    """列出该系统的所有历史分析记录摘要（按日期与版本倒序）。"""
     records = []
-    for f in sorted(system_dir.glob('*.json'), reverse=True):
+    for f in reversed(_version_files(_system_dir(system_name))):
         try:
             data = json.loads(f.read_text())
             records.append({
                 'date':          data.get('analysis_date'),
+                'analysis_id':   data.get('analysis_id') or f.stem,
                 'system_type':   data.get('system_type'),
                 'overall_score': data.get('overall_score'),
+                'completeness':  data.get('completeness'),
                 'output_mode':   data.get('output_mode', 'full'),
                 'file':          str(f),
             })

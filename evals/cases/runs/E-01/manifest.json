@@ -1,0 +1,105 @@
+{
+  "case_id": "E-01",
+  "subject": "Rust Foundation（基金会治理与 crates.io 可持续性）",
+  "system_type": "government_agency",
+  "as_of": "2026-09-08",
+  "created_at": "2026-09-09T10:21:09.501387",
+  "budget_cap": {
+    "searches": 0,
+    "tool_calls": 6,
+    "wall_clock_seconds": 1800,
+    "tokens": 40000
+  },
+  "paths": {
+    "A_current": "升级前 system-xray（记下 commit）",
+    "B_generic": "普通检索摘要 + 通用代理分析",
+    "C_new": "新版协议（本次升级后）"
+  },
+  "rounds": [
+    "fixed_material",
+    "open_retrieval"
+  ],
+  "runs": {
+    "fixed_material": {
+      "B_generic": {
+        "output_file": "outputs/fixed_material__B_generic.md",
+        "budget_used": {
+          "tool_calls": 4,
+          "searches": 0,
+          "wall_clock_seconds": 144,
+          "tokens": 62432
+        },
+        "artifacts": {},
+        "recorded_at": "2026-09-09T20:34:57.313785"
+      },
+      "C_new": {
+        "output_file": "outputs/fixed_material__C_new.md",
+        "budget_used": {
+          "tool_calls": 16,
+          "searches": 0,
+          "wall_clock_seconds": 236,
+          "tokens": 109460
+        },
+        "artifacts": {},
+        "recorded_at": "2026-09-09T20:35:57.997501"
+      },
+      "A_current": {
+        "output_file": "outputs/fixed_material__A_current.md",
+        "budget_used": {
+          "tool_calls": 18,
+          "searches": 0,
+          "wall_clock_seconds": 342,
+          "tokens": 119858
+        },
+        "artifacts": {},
+        "recorded_at": "2026-09-09T20:37:39.103200"
+      }
+    }
+  },
+  "note": "3 案试水轮之一。固定材料轮：三条路径读同一快照，**禁止检索**，searches 上限 0——这样预算天然可比，测的纯粹是推理。三条路径由隔离上下文的 subagent 分别产出。",
+  "voided_rounds": {
+    "fixed_material__asymmetric_prompts": {
+      "runs": {
+        "fixed_material": {
+          "A_current": {
+            "output_file": "outputs/fixed_material__A_current.md",
+            "budget_used": {
+              "tool_calls": 3,
+              "searches": 0,
+              "wall_clock_seconds": 621,
+              "tokens": 104858
+            },
+            "artifacts": {},
+            "recorded_at": "2026-09-09T16:40:41.990051"
+          },
+          "B_generic": {
+            "output_file": "outputs/fixed_material__B_generic.md",
+            "budget_used": {
+              "tool_calls": 2,
+              "searches": 0,
+              "wall_clock_seconds": 56,
+              "tokens": 58316
+            },
+            "artifacts": {},
+            "recorded_at": "2026-09-09T16:40:41.998494"
+          },
+          "C_new": {
+            "output_file": "outputs/fixed_material__C_new.md",
+            "budget_used": {
+              "tool_calls": 12,
+              "searches": 0,
+              "wall_clock_seconds": 604,
+              "tokens": 143854
+            },
+            "artifacts": {},
+            "recorded_at": "2026-09-09T16:40:42.002502"
+          }
+        }
+      },
+      "reason": "提示词不对称（协议修订 3 第 1 条），产出移入 outputs_void_asymmetric/",
+      "voided_at": "2026-09-09"
+    }
+  },
+  "output_char_cap": 8000,
+  "prompt_source": "evals.prompt_builder.build()——三条路径由同一模板生成，只差 spec_block"
+}

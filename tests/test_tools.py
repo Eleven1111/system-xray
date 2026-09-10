@@ -107,8 +107,9 @@ def test_same_type_bonus_is_additive_tiebreaker():
 
 # ── P6a: date-aware prediction calibration (no early-confirmed) ──
 
-def _vr(result, horizon, conf):
+def _vr(result, horizon, conf, event_type='persistence'):
     return {'verification_result': result, 'time_horizon': horizon,
+            'event_type': event_type,
             'original_prediction': {'confidence': conf, 'prediction': 'x'}}
 
 
@@ -134,12 +135,113 @@ def test_confirmed_after_horizon_is_scored():
 
 def test_early_falsified_counts_immediately():
     from agent.tools.history_compare import calculate_prediction_accuracy
-    # 提前证伪合法：条件已破，任何时候都算 resolved
+    # 持续型（persistence）的提前证伪合法：条件已破，任何时候都算 resolved
     vr = [_vr('falsified', '2026-12-31', 0.8), _vr('falsified', '2026-12-31', 0.7),
           _vr('falsified', '2026-12-31', 0.6)]
     r = calculate_prediction_accuracy(vr, as_of_date='2026-06-01')
     assert r['falsified_count'] == 3
     assert r['brier_score'] is not None
+
+
+# ── S0: 事件类型决定裁定规则（修正"提前判假"谬误）──
+
+def test_occurrence_type_rejects_early_falsification():
+    # "X 在 D 前发生"：D 之前不可能判为不成立——除非预先定义的不可能条件已被证实
+    from agent.tools.history_compare import calculate_prediction_accuracy
+    vr = [_vr('falsified', '2099-01-01', 0.8, event_type='occurrence') for _ in range(3)]
+    r = calculate_prediction_accuracy(vr, as_of_date='2026-09-08')
+    assert r['falsified_count'] == 0
+    assert r['reclassified_early_falsified'] == 3
+    assert r['brier_score'] is None            # 不用无合法依据的判假刷 Brier
+
+
+def test_occurrence_early_falsification_allowed_with_impossibility():
+    from agent.tools.history_compare import calculate_prediction_accuracy
+    vr = []
+    for _ in range(3):
+        v = _vr('falsified', '2099-01-01', 0.8, event_type='occurrence')
+        v['impossibility_established'] = True   # 预先定义且已证实的不可能条件
+        vr.append(v)
+    r = calculate_prediction_accuracy(vr, as_of_date='2026-09-08')
+    assert r['falsified_count'] == 3
+
+
+def test_unspecified_event_type_is_most_conservative():
+    # 未声明事件语义 → 两个方向都不提前裁定，并给出 flag
+    from agent.tools.history_compare import calculate_prediction_accuracy
+    vr = [{'verification_result': 'falsified', 'time_horizon': '2099-01-01',
+           'original_prediction': {'confidence': 0.8, 'prediction': 'x'}} for _ in range(3)]
+    r = calculate_prediction_accuracy(vr, as_of_date='2026-09-08')
+    assert r['falsified_count'] == 0
+    assert r['brier_score'] is None
+    assert any('event_type' in f for f in r['flags'])
+
+
+def test_conditional_prediction_not_activated_is_not_scored():
+    from agent.tools.history_compare import calculate_prediction_accuracy
+    vr = [_vr('falsified', '2026-01-01', 0.8, event_type='conditional') for _ in range(3)]
+    r = calculate_prediction_accuracy(vr, as_of_date='2026-09-08')
+    assert r['not_activated_count'] == 3
+    assert r['resolved_count'] == 0
+
+
+def test_point_in_time_waits_for_target_date():
+    from agent.tools.history_compare import calculate_prediction_accuracy
+    vr = [_vr('falsified', '2026-12-31', 0.8, event_type='point_in_time') for _ in range(3)]
+    early = calculate_prediction_accuracy(vr, as_of_date='2026-06-01')
+    due = calculate_prediction_accuracy(vr, as_of_date='2027-01-01')
+    assert early['falsified_count'] == 0        # 中途波动不提前否定
+    assert due['falsified_count'] == 3
+
+
+def test_brier_reports_baseline_and_sample_size():
+    from agent.tools.history_compare import calculate_prediction_accuracy
+    vr = [_vr('confirmed', '2026-01-01', 0.8), _vr('confirmed', '2026-01-01', 0.7),
+          _vr('falsified', '2026-01-01', 0.9)]
+    r = calculate_prediction_accuracy(vr, as_of_date='2026-09-08')
+    assert r['resolved_count'] == 3
+    assert r['baseline_brier'] is not None
+    assert r['brier_vs_baseline'] is not None
+    assert any('30 条' in f for f in r['flags'])  # 样本量不足以判断校准好坏
+
+
+# ── S0: ACH 独立证据家族去重 + 留一敏感性 ──
+
+def test_duplicate_evidence_does_not_change_status():
+    from agent.tools.ach_score import score_hypotheses
+    h = [{'id': 'H1'}, {'id': 'H2'}]
+    e = {'description': '同一条证据', 'tier': 3, 'ratings': {'H1': 'I', 'H2': 'C'}}
+    one = score_hypotheses(h, [e])
+    ten = score_hypotheses(h, [e] * 10)
+    assert {r['id']: r['status'] for r in one['ranking']} == \
+           {r['id']: r['status'] for r in ten['ranking']}
+    assert ten['evidence_families'] == 1
+    assert ten['collapsed_duplicates'][0]['copies'] == 10
+
+
+def test_explicit_source_family_collapses_reworded_reprints():
+    # 转载改了措辞，但标了同一 source_family → 仍只算 1 份独立权重
+    from agent.tools.ach_score import score_hypotheses
+    h = [{'id': 'H1'}, {'id': 'H2'}]
+    ev = [{'description': f'转载{i}', 'tier': 1, 'source_family': 'gov-press-release-0517',
+           'ratings': {'H1': 'I', 'H2': 'C'}} for i in range(3)]
+    r = score_hypotheses(h, ev)
+    assert r['evidence_families'] == 1
+    # 3 条独立 T1 的 I 本会远超阈值；折叠后恰为一条满鉴别力 T1 I
+    assert [x for x in r['ranking'] if x['id'] == 'H1'][0]['weighted_inconsistency'] == 3.0
+
+
+def test_leave_one_out_flags_decisive_evidence():
+    from agent.tools.ach_score import score_hypotheses
+    h = [{'id': 'H1'}, {'id': 'H2'}]
+    ev = [{'description': '唯一决定性证据', 'tier': 1, 'ratings': {'H1': 'I', 'H2': 'C'}}]
+    r = score_hypotheses(h, ev)
+    assert [x for x in r['ranking'] if x['id'] == 'H1'][0]['status'] == 'eliminated'
+    # 只有一族证据时移除后无剩余矩阵，敏感性不报告；加一族无关证据后应报告
+    ev.append({'description': '中性证据', 'tier': 3, 'ratings': {'H1': 'N', 'H2': 'N'}})
+    r2 = score_hypotheses(h, ev)
+    assert r2['sensitivity']['robust'] is False
+    assert r2['sensitivity']['leave_one_out'][0]['status_changes']
 
 
 # ── detect_danger_zones：危险区/生存区签名机械化 ──

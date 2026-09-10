@@ -4,8 +4,10 @@ Tool: 跨维度因果图引擎（纯计算）
 把 Step 5.2 的"21 对扫描"产出的交互边变成确定性结构：
   - 反馈回路检测（DFS 简单环搜索，按边符号乘积分类 reinforcing/balancing）
   - 恶性/良性循环判定（reinforcing 回路 + 回路内维度的当前评分/趋势）
-  - 杠杆点排序（回路参与数为主，加权度数为辅 — Meadows）
-  - 干预传播模拟（处方打在 Di 上，沿因果边逐跳衰减算出全维度涟漪）
+  - 结构中心性排序（回路参与数为主，加权度数为辅）— **不是 Meadows 杠杆等级**，见
+    `STRUCTURAL_CENTRALITY_CAVEAT`
+  - 干预传播启发式（处方打在 Di 上，沿因果边逐跳衰减算出全维度涟漪）— 序数量，非效应估计，
+    见 `PROPAGATION_CAVEAT`
   - 处方交叉检查（多处方对同一维度的叠加恶化 + 处方对之间的方向冲突）
 
 边的语义：维度**健康度**的影响关系。
@@ -116,6 +118,11 @@ def classify_loops(loops: list[dict], scores: dict | None = None,
     scores: {D1: 1-5, ...}（可选）；trajectories: {D1: 'up'|'stable'|'down', ...}（可选）。
     判定规则：reinforcing 回路内有任一维度 trajectory='down' 或平均分 ≤2.5 → vicious；
     全部 trajectory≠'down' 且平均分 ≥3.5 → virtuous；其余 → indeterminate。
+
+    **覆盖约束（S0）**：只有回路内**全部**维度都有数值评分时才判 vicious/virtuous。
+    此前按"已有分数求均值"，只给一个维度的分就能把整条回路判成良性——
+    极性可以只由边符号算出，但**运行方向与好坏**依赖回路内所有维度的状态。
+    覆盖不足时给 `indeterminate` 并在 `diagnosis_basis` 说明缺哪些维度。
     """
     scores = scores or {}
     trajectories = trajectories or {}
@@ -124,26 +131,60 @@ def classify_loops(loops: list[dict], scores: dict | None = None,
         item = dict(lp)
         if lp['polarity'] == 'balancing':
             item['diagnosis'] = 'antagonistic'
+            item['diagnosis_basis'] = '边符号乘积为负（极性可算，与评分无关）'
+            out.append(item)
+            continue
+
+        dims = lp['dims']
+        scored = {d: scores[d] for d in dims
+                  if isinstance(scores.get(d), (int, float)) and not isinstance(scores.get(d), bool)}
+        missing = [d for d in dims if d not in scored]
+        any_down = any(trajectories.get(d) == 'down' for d in dims)
+        if missing:
+            item['diagnosis'] = 'indeterminate'
+            item['diagnosis_basis'] = (
+                f'覆盖不足：{missing} 无数值评分——极性为 reinforcing 可确定，'
+                f'但运行方向（恶性/良性）未知，不得据此下好坏判断'
+            )
+            out.append(item)
+            continue
+
+        avg = sum(scored.values()) / len(scored)
+        if any_down or avg <= 2.5:
+            item['diagnosis'] = 'vicious'
+        elif avg >= 3.5:
+            item['diagnosis'] = 'virtuous'
         else:
-            dims = lp['dims']
-            dim_scores = [scores[d] for d in dims if d in scores]
-            avg = sum(dim_scores) / len(dim_scores) if dim_scores else None
-            any_down = any(trajectories.get(d) == 'down' for d in dims)
-            if any_down or (avg is not None and avg <= 2.5):
-                item['diagnosis'] = 'vicious'
-            elif not any_down and avg is not None and avg >= 3.5:
-                item['diagnosis'] = 'virtuous'
-            else:
-                item['diagnosis'] = 'indeterminate'
+            item['diagnosis'] = 'indeterminate'
+        item['diagnosis_basis'] = f'回路内全部维度已评分，均值 {avg:.2f}，趋势含 down={any_down}'
         out.append(item)
     return out
 
 
+STRUCTURAL_CENTRALITY_CAVEAT = (
+    '这是图结构中心性排序（回路参与数 + 加权度数），**不是 Meadows 杠杆等级**。'
+    'Meadows 的杠杆层级讲的是干预的**种类**（参数 < 信息结构 < 规则 < 目标 < 范式），'
+    '与节点在图中连得多不多无关。中心性高只说明"改动它波及面大"，'
+    '不说明它可干预、成本低、或效果大——可干预性须另做审查（谁有权限、要多少提前量、'
+    '有没有不可逆投入）。'
+)
+
+PROPAGATION_CAVEAT = (
+    '传播值是按固定边权（strong 0.6 / weak 0.3）逐跳衰减的**启发式序数量**，'
+    '不是效应估计：无单位、无时间步长、无延迟、无阈值，且一条路径不重访节点'
+    '（因此含反馈的图并未被真正模拟）。只可用于比较"哪些维度更可能被波及、方向如何"，'
+    '不得据此承诺改善幅度。'
+)
+
+
 def rank_leverage(edges: list[dict], loops: list[dict] | None = None) -> list[dict]:
     """
-    杠杆点排序（Meadows）：主键 = 回路参与数，次键 = 加权度数（出+入，strong=0.6/weak=0.3）。
+    结构中心性排序：主键 = 回路参与数，次键 = 加权度数（出+入，strong=0.6/weak=0.3）。
 
     返回降序 [{dim, label, loop_count, weighted_degree}]。
+
+    ⚠️ 命名更正（S0）：此前本函数被描述为"Meadows 杠杆点排序"。
+    见 STRUCTURAL_CENTRALITY_CAVEAT——图中心性 ≠ Meadows 杠杆等级 ≠ 可干预性。
     """
     if loops is None:
         loops = find_feedback_loops(edges)
@@ -272,9 +313,19 @@ def analyze_graph(payload: dict) -> dict:
             'dims': lp['dims'],
             'polarity': lp['polarity'],
             'diagnosis': lp['diagnosis'],
+            'diagnosis_basis': lp.get('diagnosis_basis', ''),
             'min_strength': lp['min_strength'],
         } for lp in loops],
         'leverage_ranking': rank_leverage(edges, loops),
+        'ranking_basis': 'structural_centrality',
+        'caveats': {
+            'leverage_ranking': STRUCTURAL_CENTRALITY_CAVEAT,
+            'propagation': PROPAGATION_CAVEAT,
+            'graph_level': (
+                'L1 解释性机制图：只能给条件性方向推演。禁止由这里的箭头、序数分数或'
+                '传播系数直接生成 L3 风格的效果承诺；含反馈的图也不能当作无环因果图使用。'
+            ),
+        },
     }
     if payload.get('prescriptions'):
         result['prescription_check'] = cross_check_prescriptions(

@@ -1,0 +1,60 @@
+{
+  "case_id": "PILOT-RF",
+  "subject": "Rust Foundation（基金会治理与 crates.io 可持续性）",
+  "system_type": "government_agency",
+  "as_of": "2026-09-08",
+  "created_at": "2026-09-08T20:02:25.434903",
+  "budget_cap": {
+    "searches": 6,
+    "tool_calls": 12,
+    "wall_clock_seconds": 1800,
+    "tokens": 60000
+  },
+  "paths": {
+    "A_current": "升级前 system-xray（记下 commit）",
+    "B_generic": "普通检索摘要 + 通用代理分析",
+    "C_new": "新版协议（本次升级后）"
+  },
+  "rounds": [
+    "fixed_material",
+    "open_retrieval"
+  ],
+  "runs": {
+    "fixed_material": {
+      "A_current": {
+        "output_file": "outputs/fixed_material__A_current.md",
+        "budget_used": {
+          "tool_calls": 5,
+          "searches": 4,
+          "wall_clock_seconds": 300,
+          "tokens": 9000
+        },
+        "artifacts": {},
+        "recorded_at": "2026-09-08T20:05:56.411409"
+      },
+      "B_generic": {
+        "output_file": "outputs/fixed_material__B_generic.md",
+        "budget_used": {
+          "tool_calls": 5,
+          "searches": 4,
+          "wall_clock_seconds": 240,
+          "tokens": 7000
+        },
+        "artifacts": {},
+        "recorded_at": "2026-09-08T20:05:56.411939"
+      },
+      "C_new": {
+        "output_file": "outputs/fixed_material__C_new.md",
+        "budget_used": {
+          "tool_calls": 6,
+          "searches": 4,
+          "wall_clock_seconds": 360,
+          "tokens": 10000
+        },
+        "artifacts": {},
+        "recorded_at": "2026-09-08T20:05:56.412459"
+      }
+    }
+  },
+  "note": "试点：验证仪器能否跑通，**不验证方法有效**。已知缺陷：三条路径由同一模型在同一会话内先后产出，上下文互相污染——正式评估必须在隔离上下文中分别运行。本试点结果不计入任何成绩。"
+}

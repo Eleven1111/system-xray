@@ -1,0 +1,26 @@
+{
+  "_README": [
+    "匿名评分表模板。每行 = 一个案例中匿名候选相对匿名比较对象的有向判定。",
+    "填表前先读 evals/protocol.md §2 的三级判据，并确认预登记已提交。",
+    "评审只能填写 candidate_label 与 comparator_label（例如 P/Q/R），不得填写 A_current、B_generic 或 C_new。",
+    "score：0 = 仅换措辞/无证据；1 = 有证据的新解释但未改变调查或行动；",
+    "        2 = 有证据且明确改变调查优先级/行动选择/行动条件，并能指出新增的推理步骤。",
+    "rationale 必填——判据要求可被第三方复核。",
+    "两名评审分歧时填 arbitration（裁决人不能是原评审）；无裁决按预登记规则不计合格。",
+    "评审拿到的应是 blind_package() 产出的 items，不含 key；收齐并冻结后，组织者使用私有 key 调用 unblind_ratings() 转换。"
+  ],
+  "pre_registration_commit": "",
+  "threshold": {"qualified_cases": 8, "total_cases": 12},
+  "blind_cases": [
+    {
+      "case_id": "CASE-01",
+      "candidate_label": "",
+      "comparator_label": "",
+      "ratings": [
+        {"reviewer": "", "score": null, "rationale": ""},
+        {"reviewer": "", "score": null, "rationale": ""}
+      ],
+      "arbitration": null
+    }
+  ]
+}

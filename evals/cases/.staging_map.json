@@ -1,0 +1,17 @@
+{
+  "E-01": {
+    "A_current": "s2",
+    "B_generic": "s3",
+    "C_new": "s1"
+  },
+  "P-01": {
+    "A_current": "s2",
+    "B_generic": "s3",
+    "C_new": "s1"
+  },
+  "R-01": {
+    "A_current": "s3",
+    "B_generic": "s1",
+    "C_new": "s2"
+  }
+}
