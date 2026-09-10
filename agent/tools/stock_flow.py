@@ -138,12 +138,27 @@ def simulate(model: dict, overrides: dict | None = None) -> dict:
                 basis = actual
             rates[f['name']] = float(rate['coefficient']) * basis
 
+        # 同一存量的多个流出必须共享本步可用量。逐条 min 会让每条都以
+        # 原始存量为上限，从而在一个时间步抽出超过 100% 的资源。
+        effective_rates = dict(rates)
+        outgoing: dict[str, list[dict]] = {}
+        for f in flows:
+            src = f.get('from')
+            if src is not None and rates[f['name']] > 0:
+                outgoing.setdefault(src, []).append(f)
+        for src, source_flows in outgoing.items():
+            requested = sum(rates[f['name']] for f in source_flows)
+            available = stocks[src] / dt
+            if requested > available:
+                scale = available / requested
+                for f in source_flows:
+                    effective_rates[f['name']] *= scale
+
         deltas = {k: 0.0 for k in stocks}
         for f in flows:
-            r = rates[f['name']]
+            r = effective_rates[f['name']]
             if f.get('from') is not None:
                 # 存量不能被抽成负数：一步之内最多抽干
-                r = min(r, stocks[f['from']] / dt) if r > 0 else r
                 deltas[f['from']] -= r
             if f.get('to') is not None:
                 deltas[f['to']] += r
@@ -157,24 +172,24 @@ def simulate(model: dict, overrides: dict | None = None) -> dict:
             'final': {k: round(v, 6) for k, v in stocks.items()}, 'errors': []}
 
 
-def _corners(parameter_ranges: dict) -> list[dict]:
-    """参数区间的角点组合（每个参数取上下界）。参数多时只取单参数扰动，避免组合爆炸。"""
+def _corners(parameter_ranges: dict) -> tuple[list[dict], str]:
+    """参数区间角点；组合过多时明确降级为单参数扰动，绝不冒充全覆盖。"""
     keys = sorted(parameter_ranges)
     if not keys:
-        return []
+        return [], 'none'
     if len(keys) <= 3:
         combos = [{}]
         for k in keys:
             lo, hi = parameter_ranges[k]
             combos = [{**c, k: v} for c in combos for v in (lo, hi)]
-        return combos
+        return combos, 'full_corners'
     # 超过 3 个参数：逐个单独扰动（一次一个），其余取区间中点
     mid = {k: (parameter_ranges[k][0] + parameter_ranges[k][1]) / 2 for k in keys}
     out = []
     for k in keys:
         for v in parameter_ranges[k]:
             out.append({**mid, k: v})
-    return out
+    return out, 'one_at_a_time'
 
 
 def run_with_sensitivity(model: dict, verdict: dict) -> dict:
@@ -228,7 +243,8 @@ def run_with_sensitivity(model: dict, verdict: dict) -> dict:
             declared_outside.append(f'{key}={current} 不在声明区间 [{lo}, {hi}] 内')
 
     runs, flips = [], []
-    for combo in _corners(ranges):
+    corners, coverage = _corners(ranges)
+    for combo in corners:
         r = simulate(model, overrides=combo)
         if r.get('errors'):
             return {'errors': r['errors']}
@@ -242,18 +258,27 @@ def run_with_sensitivity(model: dict, verdict: dict) -> dict:
                        if any(r['verdict_holds'] != base_holds and r['overrides'].get(k) == v
                               for r in runs)})
 
-    robust = not flips
+    # 单参数扰动不能排除参数联合作用；没有翻转只能说明这组抽样没有发现，
+    # 不能证明整个超矩形区间稳健。
+    robust = (not flips) if coverage == 'full_corners' else (False if flips else None)
+    if robust is True:
+        conclusion = '结论在已枚举的整个参数区间角点内稳健'
+    elif robust is False:
+        conclusion = (f'**结论不稳健**：在参数区间内会翻转，翻转由 {culprits} 驱动——'
+                      f'按 L2 规则应停在方向性描述，或先把这些参数钉死')
+    else:
+        conclusion = ('未证明整个参数区间稳健：当前只做单参数扰动，未发现翻转，'
+                      '但尚未检验参数联合作用；缩窄范围、增加联合抽样或使用专门敏感性方法')
     return {
         'verdict': f'{stock} 期末{"高于" if test == "above" else "低于"} {threshold}',
         'baseline_overrides': midpoints,
         'holds_at_base': base_holds,
         'robust': robust,
+        'coverage': coverage,
         'runs': runs,
         'flipping_parameters': culprits,
         'spec_warnings': declared_outside,
-        'conclusion': ('结论在整个参数区间内稳健' if robust else
-                       f'**结论不稳健**：在参数区间内会翻转，翻转由 {culprits} 驱动——'
-                       f'按 L2 规则应停在方向性描述，或先把这些参数钉死'),
+        'conclusion': conclusion,
         'errors': [],
     }
 

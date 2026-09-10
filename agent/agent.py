@@ -242,9 +242,10 @@ def cmd_build_audit(args):
 
 
 def cmd_triage_claims(args):
-    """从 analysis JSON 的 key_claims 分诊出最该独立 fact_check 的载荷性薄佐证断言。"""
+    """从 analysis JSON 的 claims 账本（兼容 key_claims）分诊独立 fact-check。"""
     analysis = json.loads(_read_payload(args.input))
-    kc = analysis.get('key_claims') if isinstance(analysis, dict) else analysis
+    kc = ((analysis.get('claims') or analysis.get('key_claims'))
+          if isinstance(analysis, dict) else analysis)
     n = args.sample if args.sample else 5
     triaged = triage_claims_for_factcheck(kc or [], max_n=n)
     if not triaged:

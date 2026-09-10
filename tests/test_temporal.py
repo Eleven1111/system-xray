@@ -11,6 +11,7 @@ S2 跨期更新测试：不可变版本 / 双时间 / 按类型时效 / 口径�
 
 import json
 import sys
+import threading
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -42,6 +43,28 @@ def test_same_day_saves_keep_two_versions(tmp_path, monkeypatch):
     assert len(versions) == 2
     assert versions[0]['analysis_id'] == '20260908-001'
     assert versions[1]['analysis_id'] == '20260908-002'
+
+
+def test_concurrent_saves_reserve_distinct_immutable_versions(tmp_path, monkeypatch):
+    import agent.store.db as db
+    monkeypatch.setattr(db, 'DATA_DIR', tmp_path)
+    barrier = threading.Barrier(2)
+    paths, failures = [], []
+
+    def save(score):
+        try:
+            barrier.wait()
+            paths.append(db.save_analysis('S', 'public_company', _minimal(score),
+                                          date_str='20260908'))
+        except Exception as exc:  # pragma: no cover - assertion exposes unexpected failure
+            failures.append(exc)
+
+    workers = [threading.Thread(target=save, args=(score,)) for score in (3, 4)]
+    [w.start() for w in workers]
+    [w.join() for w in workers]
+    assert failures == []
+    assert len(set(paths)) == 2
+    assert len(db.list_versions('S')) == 2
 
 
 def test_version_can_be_rebuilt_by_analysis_id(tmp_path, monkeypatch):
@@ -188,6 +211,15 @@ def test_score_move_under_same_basis_is_a_system_change():
     assert row['change_type'] == 'system_state'
 
 
+def test_legacy_history_comparison_does_not_call_basis_change_improvement():
+    from agent.tools.history_compare import compare_history
+    prev = {'dimension_scores': {'D1': 2}, 'dimension_basis_version': {'D1': 'v1'}}
+    cur = {'dimension_scores': {'D1': 4}, 'dimension_basis_version': {'D1': 'v2'}}
+    result = compare_history('S', cur, prev)
+    assert 'D1' not in result['improving']
+    assert any('口径已变更' in warning for warning in result['trajectory_warnings'])
+
+
 def test_withdrawal_driven_by_contradicted_claim_is_an_analysis_correction():
     prev = {'mechanisms': [{'id': 'M1', 'explains': 'x'}]}
     cur = {'mechanisms': [],
@@ -226,6 +258,19 @@ def test_freeze_refuses_to_overwrite_existing_id():
     assert len(r2['registry']) == 1
 
 
+def test_save_path_freezes_predictions_and_preserves_initial_probability(tmp_path, monkeypatch):
+    import agent.store.db as db
+    monkeypatch.setattr(db, 'DATA_DIR', tmp_path)
+    first = _minimal(); first['predictions'] = [_pred('P1', 0.4)]
+    db.save_analysis('S', 'public_company', first, date_str='20260908')
+    second = _minimal(); second['prediction_updates'] = [
+        {'id': 'P1', 'updates': {'confidence': 0.9}, 'reason': 'new evidence'}]
+    db.save_analysis('S', 'public_company', second, date_str='20260909')
+    saved = db.load_latest('S')['prediction_registry']
+    assert [p['confidence'] for p in saved] == [0.4, 0.9]
+    assert [p['confidence'] for p in db.load_predictions('S')] == [0.4]
+
+
 def test_update_appends_version_and_keeps_initial_value():
     reg = freeze_predictions([_pred('P1', 0.4)], frozen_at='2026-09-08')['registry']
     reg = update_prediction(reg, 'P1', {'confidence': 0.9}, updated_at='2026-12-01',
@@ -238,6 +283,18 @@ def test_update_cannot_change_frozen_event_definition():
     reg = freeze_predictions([_pred('P1')], frozen_at='2026-09-08')['registry']
     r = update_prediction(reg, 'P1', {'time_horizon': '2027-12-31'}, updated_at='2026-12-01')
     assert r['errors'] and 'time_horizon' in r['errors'][0]
+
+
+def test_update_cannot_sneak_in_a_new_adjudication_rule():
+    reg = freeze_predictions([_pred('P1')], frozen_at='2026-09-08')['registry']
+    r = update_prediction(reg, 'P1', {'adjudication_sources': ['new source']},
+                          updated_at='2026-12-01')
+    assert r['errors'] and '允许更新列表' in r['errors'][0]
+
+
+def test_freeze_rejects_invalid_confidence():
+    r = freeze_predictions([_pred('P1', 1.1)], frozen_at='2026-09-08')
+    assert r['errors'] and 'confidence' in r['errors'][0]
 
 
 def test_review_policy_first_prevents_cherry_picking():

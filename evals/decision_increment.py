@@ -21,10 +21,10 @@
 | 2 | 有证据，且明确改变调查优先级、行动选择或行动条件，并能指出相对该基线新增的推理步骤 |
 """
 
-import hashlib
 import json
 import random
 import re
+import secrets
 
 VALID_RATINGS = (0, 1, 2)
 QUALIFYING_RATING = 2
@@ -49,9 +49,10 @@ def blind_package(case_id: str, outputs: dict, seed: str | None = None) -> dict:
 
     返回 `{case_id, items: [{label, text}], key: {label: path_name}}`。
     **`key` 必须与 `items` 分开保管**——交给评审的只有 items。
-    顺序由 case_id 派生的种子决定：可复现，但不可从标签反推路径。
+    未显式传 seed 时使用私有随机 nonce；评审若知道 case_id 和路径集合，也不能
+    从公开标签重建映射。需要可重复生成时，调用者必须自行私下保管显式 seed。
     """
-    rng = random.Random(seed or hashlib.sha256(case_id.encode()).hexdigest())
+    rng = random.Random(seed or secrets.token_hex(32))
     paths = sorted(outputs)
     # 标签刻意不用 A/B/C：路径名就叫 A_current/B_generic/C_new，
     # 同字母会诱使评审去做"标签 A = 路径 A"的映射猜测，而随机打乱迟早会撞上一次真对应。
@@ -122,13 +123,47 @@ def score_case(case_id: str, baseline: str, ratings: list[dict],
             'arbitrated_score': arbitration['score'], 'problems': []}
 
 
+def unblind_ratings(blind_cases: list[dict], key: dict[str, str],
+                    candidate_path: str = 'C_new') -> dict:
+    """将收回且冻结的匿名有向比较转换为 C 对每条基线的评分。"""
+    results, errors = [], []
+    for i, row in enumerate(blind_cases or []):
+        if not isinstance(row, dict):
+            errors.append(f'blind_cases[{i}] 必须是对象')
+            continue
+        candidate, comparator = row.get('candidate_label'), row.get('comparator_label')
+        if candidate not in key or comparator not in key:
+            errors.append(f'blind_cases[{i}] 含未知匿名标签')
+            continue
+        if candidate == comparator:
+            errors.append(f'blind_cases[{i}] 候选与比较对象不能相同')
+            continue
+        if key[candidate] != candidate_path:
+            continue
+        baseline = key[comparator]
+        if baseline == candidate_path:
+            errors.append(f'blind_cases[{i}] 解盲后比较对象仍是 {candidate_path}')
+            continue
+        results.append(score_case(row.get('case_id', ''), baseline,
+                                  row.get('ratings') or [], row.get('arbitration')))
+    return {'results': results, 'errors': errors, 'candidate_path': candidate_path,
+            'note': '原始匿名评分与私有 key 均须保留；转换在评分冻结后执行'}
+
+
 def aggregate(case_results: list[dict], threshold: dict | None = None) -> dict:
     """
     按基线分别汇总。**不合并不同基线**——相对现版和相对普通研究路径是两个问题。
     """
     th = threshold or DEFAULT_THRESHOLD
     by_baseline: dict[str, list[dict]] = {}
+    duplicates: list[str] = []
+    seen: set[tuple[str, str]] = set()
     for r in case_results:
+        key = (r.get('baseline'), r.get('case_id'))
+        if key in seen:
+            duplicates.append(f'{key[0]}/{key[1]}')
+            continue
+        seen.add(key)
         by_baseline.setdefault(r['baseline'], []).append(r)
 
     summary = {}
@@ -159,6 +194,11 @@ def aggregate(case_results: list[dict], threshold: dict | None = None) -> dict:
         if s['invalid_ratings']:
             flags.append(f'基线「{baseline}」有 {len(s["invalid_ratings"])} 案评分无效：'
                          f'{s["invalid_ratings"]}')
+    if duplicates:
+        flags.append(
+            f'发现重复的「基线/案例」评分 {duplicates}：重复项未计入样本，'
+            '须修正评分文件后才能据此作任何阈值结论'
+        )
     return {'by_baseline': summary, 'flags': flags,
             'note': ('12 个案例仅是原型筛选，达标也不足以声称跨领域普遍有效；'
                      '未达标应如实报告，不以其他指标替代')}

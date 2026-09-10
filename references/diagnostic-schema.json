@@ -1,6 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "SystemPathologyDiagnosticReport",
+  "x-schema-version": "2.0",
+  "x-runtime-projection": "agent.schema_adapter.to_runtime / to_document",
   "description": "Structured output schema for system pathology analyses. Enables tracking, comparison, and longitudinal monitoring across analyses.",
   "type": "object",
   "required": [

@@ -169,8 +169,33 @@ def test_marking_needs_review_satisfies_propagation():
     a = _base()
     a['claims'][0]['status'] = 'contradicted'
     a['mechanisms'][0]['needs_review'] = True
+    a['actions'][0]['needs_review'] = True
     errors, _ = validate_contract(a)
     assert not any('needs_review' in e for e in errors)
+
+
+def test_contradiction_propagates_through_declared_mechanism_and_action_links():
+    a = _base()
+    a['claims'][0]['loads'] = []
+    a['claims'][0]['status'] = 'contradicted'
+    errors, _ = validate_contract(a)
+    assert any('M1' in e and 'needs_review' in e for e in errors)
+    assert any('A1' in e and 'needs_review' in e for e in errors)
+    a['mechanisms'][0]['needs_review'] = True
+    a['actions'][0]['needs_review'] = True
+    errors, _ = validate_contract(a)
+    assert not any('needs_review' in e for e in errors)
+
+
+def test_empty_claim_or_mechanism_catalogue_does_not_allow_broken_reference():
+    a = _base()
+    a['claims'] = []
+    errors, _ = validate_contract(a)
+    assert any('C1' in e for e in errors)
+    a = _base()
+    a['mechanisms'] = []
+    errors, _ = validate_contract(a)
+    assert any('M1' in e for e in errors)
 
 
 def test_unreachable_source_does_not_propagate_as_refutation():
@@ -295,6 +320,16 @@ def test_draft_can_still_be_saved(tmp_path, monkeypatch):
     a['completeness'] = 'draft'
     path = db.save_analysis('T', 'public_company', a, date_str='20260101')
     assert Path(path).exists()
+
+
+def test_save_rejects_new_contract_with_unknown_action_mechanism(tmp_path, monkeypatch):
+    import pytest
+    import agent.store.db as db
+    monkeypatch.setattr(db, 'DATA_DIR', tmp_path)
+    a = _base()
+    a['actions'][0]['mechanism_id'] = 'M404'
+    with pytest.raises(ValueError, match='M404'):
+        db.save_analysis('T', 'public_company', a, date_str='20260101')
 
 
 def test_system_metadata_cannot_be_overridden_by_payload(tmp_path, monkeypatch):

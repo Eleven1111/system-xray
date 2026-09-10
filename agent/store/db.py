@@ -458,6 +458,19 @@ def _next_analysis_id(system_dir: Path, date_str: str) -> str:
     return f'{date_str}-{seq:03d}'
 
 
+def _reserve_analysis_file(system_dir: Path, date_str: str) -> tuple[str, Path, int]:
+    """用 O_EXCL 预留版本文件，避免并发调用取得同一个 sequence 后互相覆盖。"""
+    for _ in range(10000):
+        analysis_id = _next_analysis_id(system_dir, date_str)
+        filepath = system_dir / f'{analysis_id}.json'
+        try:
+            fd = os.open(filepath, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            return analysis_id, filepath, fd
+        except FileExistsError:
+            continue
+    raise RuntimeError(f'无法为 {date_str} 分配唯一分析版本号')
+
+
 def _rebuild_index(system_dir: Path) -> dict:
     """
     重建 index.json。
@@ -514,30 +527,61 @@ def save_analysis(
     validate=True（默认）时，落盘前调用 validate_analysis() 校验结构；不合法则
     抛 ValueError 并附完整错误清单，避免污染数据持久化。测试可传 validate=False 绕过。
     """
+    if date_str is None:
+        date_str = datetime.now().strftime('%Y%m%d')
+
     if validate:
         errors = validate_analysis(analysis)
+        # 新契约对象存在时，不能绕过对象层、血缘与行动约束直接落盘。
+        # 延迟导入避免 validation -> db 的模块循环；旧记录保持原有兼容路径。
+        if any(k in analysis for k in ('claims', 'mechanisms', 'actions',
+                                       'analysis_contract', 'coverage_audit')):
+            from agent.validation import validate_contract
+            contract_errors, _ = validate_contract(analysis)
+            errors = contract_errors
         if errors:
             raise ValueError(
                 'analysis 结构校验失败，已拒绝持久化：\n  - ' + '\n  - '.join(errors)
             )
 
-    if date_str is None:
-        date_str = datetime.now().strftime('%Y%m%d')
-
     system_dir = _system_dir(system_name)
     system_dir.mkdir(parents=True, exist_ok=True)
 
     previous = _version_files(system_dir)
-    supersedes = None
+    supersedes, previous_record = None, {}
     if previous:
         try:
             prev = json.loads(previous[-1].read_text())
+            previous_record = prev
             supersedes = prev.get('analysis_id') or previous[-1].stem
         except json.JSONDecodeError:
             supersedes = previous[-1].stem
 
-    analysis_id = _next_analysis_id(system_dir, date_str)
-    filepath = system_dir / f'{analysis_id}.json'
+    # S2 主路径：新预测在第一次保存时冻结，后续概率调整只能通过追加版本。
+    # 没有稳定 id 的旧 predictions 保持兼容读取，但不能被当作登记册的新增条目。
+    prediction_registry = list(previous_record.get('prediction_registry') or [])
+    incoming_predictions = analysis.get('predictions') or []
+    registry_errors = []
+    if incoming_predictions and all(isinstance(p, dict) and p.get('id') for p in incoming_predictions):
+        from agent.tools.forecast_registry import freeze_predictions
+        frozen = freeze_predictions(incoming_predictions, frozen_at=date_str,
+                                    registry=prediction_registry)
+        prediction_registry, registry_errors = frozen['registry'], frozen['errors']
+    if analysis.get('prediction_updates'):
+        from agent.tools.forecast_registry import update_prediction
+        for update in analysis.get('prediction_updates') or []:
+            if not isinstance(update, dict):
+                registry_errors.append('prediction_updates 条目必须是对象')
+                continue
+            changed = update_prediction(prediction_registry, update.get('id'),
+                                        update.get('updates') or {}, date_str,
+                                        update.get('reason', ''))
+            prediction_registry, errors = changed['registry'], changed['errors']
+            registry_errors += errors
+    if registry_errors:
+        raise ValueError('预测登记失败，已拒绝持久化：\n  - ' + '\n  - '.join(registry_errors))
+
+    analysis_id, filepath, fd = _reserve_analysis_file(system_dir, date_str)
 
     # S0：系统元数据由调用方参数决定，**不允许被 analysis 输入覆盖**。
     # 此前 `**analysis` 展开在后，一份 analysis 里写个 analysis_date 就能改写生成元数据。
@@ -551,7 +595,16 @@ def save_analysis(
         'saved_at':      datetime.now().isoformat(),
         'completeness':  analysis.get('completeness') or derive_completeness(analysis),
     }
-    filepath.write_text(json.dumps(record, ensure_ascii=False, indent=2))
+    if prediction_registry:
+        record['prediction_registry'] = prediction_registry
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(record, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+    except Exception:
+        filepath.unlink(missing_ok=True)
+        raise
     _rebuild_index(system_dir)
     return str(filepath)
 
@@ -620,6 +673,10 @@ def load_predictions(system_name: str) -> list[dict]:
     latest = load_latest(system_name)
     if latest is None:
         return []
+    registry = latest.get('prediction_registry')
+    if registry:
+        from agent.tools.forecast_registry import select_versions
+        return select_versions(registry, policy='first')['selected']
     return latest.get('predictions', [])
 
 

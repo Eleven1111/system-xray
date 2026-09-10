@@ -23,6 +23,7 @@ from agent.store.db import (
 )
 from agent.tools.evidence_lineage import lineage_report
 from agent.tools.temporal import check_time_fields, staleness_report
+from agent.schema_adapter import to_runtime
 
 _ID_PREFIX = {'claims': 'C', 'mechanisms': 'M', 'actions': 'A'}
 
@@ -97,6 +98,8 @@ def _check_claims(analysis: dict) -> tuple[list[str], list[str]]:
             if not isinstance(s, dict):
                 errors.append(f'{tag}.sources[{j}] 必须是对象')
                 continue
+            if not isinstance(s.get('url'), str) or not s['url'].strip():
+                errors.append(f'{tag}.sources[{j}] 缺少 url（断言必须可回到原始材料）')
             if s.get('role') not in ('supports', 'contradicts', 'background'):
                 errors.append(
                     f'{tag}.sources[{j}].role 必须是 supports/contradicts/background——'
@@ -148,7 +151,7 @@ def _check_mechanisms(analysis: dict) -> tuple[list[str], list[str]]:
                     f'条件不满足时说明不能识别或不能估计，停在方向性解释'
                 )
         for ref in (m.get('supporting_claims') or []) + (m.get('contradicting_claims') or []):
-            if claim_ids and ref not in claim_ids:
+            if ref not in claim_ids:
                 errors.append(f'{tag} 引用了不存在的断言 id "{ref}"')
     return errors, warnings
 
@@ -171,7 +174,7 @@ def _check_actions(analysis: dict) -> tuple[list[str], list[str]]:
         mid = a.get('mechanism_id')
         if not mid:
             errors.append(f'{tag} 缺少 mechanism_id——建议必须说明通过哪个机制起作用')
-        elif mech_ids and mid not in mech_ids:
+        elif mid not in mech_ids:
             errors.append(f'{tag} 引用了不存在的机制 id "{mid}"')
         role = a.get('executor_role')
         if role not in _VALID_EXECUTOR_ROLES:
@@ -305,6 +308,7 @@ def validate_contract(analysis: dict, ablate: frozenset = frozenset()) -> tuple[
     """
     if not isinstance(analysis, dict):
         return ([f'analysis 必须是对象，实际为 {type(analysis).__name__}'], [])
+    analysis = to_runtime(analysis)
 
     unknown = sorted(set(ablate) - set(ABLATABLE))
     if unknown:

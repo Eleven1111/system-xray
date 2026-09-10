@@ -15,7 +15,7 @@ from agent.tools.history_compare import (                      # noqa: E402
 )
 from evals import synthetic                                    # noqa: E402
 from evals.decision_increment import (                         # noqa: E402
-    aggregate, blind_package, score_case,
+    aggregate, blind_package, score_case, unblind_ratings,
 )
 
 
@@ -142,6 +142,13 @@ def test_incomplete_sample_cannot_claim_threshold():
     assert any('样本不全' in f for f in agg['flags'])
 
 
+def test_duplicate_case_cannot_inflate_threshold_sample():
+    row = score_case('C1', 'A_current', [_rating('R1', 2), _rating('R2', 2)])
+    agg = aggregate([row] * 12, threshold={'qualified_cases': 1, 'total_cases': 1})
+    assert agg['by_baseline']['A_current']['cases_scored'] == 1
+    assert any('重复' in f for f in agg['flags'])
+
+
 def test_blind_package_hides_path_identity():
     outputs = {'C_new': 'system-xray 七维诊断：D3 信息与反馈恶化，机制卡显示……',
                'A_current': '旧版 ACH 分析结果……',
@@ -155,4 +162,33 @@ def test_blind_package_hides_path_identity():
 
 def test_blind_package_is_reproducible():
     outputs = {'a': 'x', 'b': 'y', 'c': 'z'}
-    assert blind_package('CASE-02', outputs)['key'] == blind_package('CASE-02', outputs)['key']
+    assert (blind_package('CASE-02', outputs, seed='private-test-seed')['key']
+            == blind_package('CASE-02', outputs, seed='private-test-seed')['key'])
+
+
+def test_blind_package_default_nonce_does_not_depend_on_public_case_id():
+    outputs = {'a': 'x', 'b': 'y', 'c': 'z'}
+    # 密码学随机 nonce 极小概率碰撞；断言随机源被调用，而非把 case_id 当种子。
+    from unittest.mock import patch
+    with patch('evals.decision_increment.secrets.token_hex', return_value='nonce-one'):
+        one = blind_package('CASE-02', outputs)['key']
+    with patch('evals.decision_increment.secrets.token_hex', return_value='nonce-two'):
+        two = blind_package('CASE-02', outputs)['key']
+    assert one != two
+
+
+def test_anonymous_ratings_unblind_only_new_vs_each_baseline():
+    key = {'P': 'C_new', 'Q': 'A_current', 'R': 'B_generic'}
+    ratings = [
+        {'case_id': 'C1', 'candidate_label': 'P', 'comparator_label': 'Q',
+         'ratings': [_rating('R1', 2), _rating('R2', 2)]},
+        {'case_id': 'C1', 'candidate_label': 'P', 'comparator_label': 'R',
+         'ratings': [_rating('R1', 1), _rating('R2', 1)]},
+        {'case_id': 'C1', 'candidate_label': 'Q', 'comparator_label': 'R',
+         'ratings': [_rating('R1', 2), _rating('R2', 2)]},
+    ]
+    out = unblind_ratings(ratings, key)
+    assert out['errors'] == []
+    assert [(r['baseline'], r['qualified']) for r in out['results']] == [
+        ('A_current', True), ('B_generic', False)
+    ]

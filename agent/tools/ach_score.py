@@ -250,6 +250,7 @@ def score_hypotheses(hypotheses: list[dict], evidence: list[dict]) -> dict:
     families, collapsed = collapse_evidence_families(evidence)
     ranking = _rank(hypotheses, families)
     loo = _leave_one_out(hypotheses, families, ranking)
+    sensitivity_adequate = len(families) >= 2
 
     flags: list[str] = []
     if collapsed:
@@ -261,6 +262,11 @@ def score_hypotheses(hypotheses: list[dict], evidence: list[dict]) -> dict:
         flags.append(
             f'{len(loo)} 条证据家族具有决定性：移除任一条会翻转假说状态——结论依赖关键证据，'
             f'须在报告中显式说明，不得输出无条件强结论'
+        )
+    elif not sensitivity_adequate:
+        flags.append(
+            '只有 1 个独立证据家族，无法执行有意义的留一稳健性检验——'
+            '不得把无翻转报告为稳健，应补充独立证据'
         )
     statuses = [r['status'] for r in ranking]
     survivors = [r for r in ranking if r['status'] in ('active', 'stressed')]
@@ -279,7 +285,11 @@ def score_hypotheses(hypotheses: list[dict], evidence: list[dict]) -> dict:
         'evidence_families': len(families),
         'evidence_items_submitted': len(evidence),
         'collapsed_duplicates': collapsed,
-        'sensitivity': {'leave_one_out': loo, 'robust': not loo},
+        'sensitivity': {
+            'leave_one_out': loo,
+            'robust': (not loo) if sensitivity_adequate else None,
+            'adequate_for_leave_one_out': sensitivity_adequate,
+        },
         'status_legend': STATUS_LEGEND,
         'flags': flags,
         'errors': [],

@@ -115,6 +115,36 @@ def test_zero_search_round_counts_as_exact_parity():
     assert r['ratios']['searches'] == 1.0
 
 
+def test_zero_and_positive_searches_are_not_comparable():
+    _init(cap={'searches': 8})
+    _record_all(budgets={
+        'A_current': _budget(searches=0),
+        'B_generic': _budget(searches=6),
+        'C_new': _budget(searches=6),
+    })
+    r = run_case.check_comparability('PILOT-00', 'fixed_material')
+    assert r['comparable'] is False
+    assert any('证据访问不等量' in e for e in r['errors'])
+
+
+def test_run_rejects_negative_or_nonfinite_budget():
+    _init()
+    assert run_case.record_run('PILOT-00', 'C_new', 'fixed_material', 'x',
+                               _budget(searches=-1))['errors']
+    assert run_case.record_run('PILOT-00', 'C_new', 'fixed_material', 'x',
+                               _budget(tokens=float('inf')))['errors']
+
+
+def test_declared_baseline_requires_full_execution_closure():
+    run_case.init_case('PILOT-00', subject='某系统', as_of='2026-09-08',
+                       system_type='platform', budget_cap={'searches': 0},
+                       baseline_revision='5069839')
+    _record_all(budgets={p: _budget(searches=0) for p in run_case.PATHS})
+    r = run_case.check_comparability('PILOT-00', 'fixed_material')
+    assert r['comparable'] is False
+    assert any('执行闭包' in e for e in r['errors'])
+
+
 def test_negative_control_consumption_warning_disappears_when_loosened(monkeypatch):
     """负控：放宽容忍度后，成本告警必须消失——证明它真的由比值驱动。"""
     _init(cap={'searches': 0})

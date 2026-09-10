@@ -14,6 +14,7 @@
 """
 
 import json
+import math
 from datetime import datetime
 from pathlib import Path
 
@@ -63,7 +64,7 @@ def case_dir(case_id: str) -> Path:
 
 
 def init_case(case_id: str, subject: str, as_of: str, system_type: str,
-              budget_cap: dict, note: str = '') -> dict:
+              budget_cap: dict, note: str = '', baseline_revision: str | None = None) -> dict:
     """建立案例运行目录与 manifest。预算上限在**跑之前**写死。"""
     d = case_dir(case_id)
     (d / 'outputs').mkdir(parents=True, exist_ok=True)
@@ -75,6 +76,7 @@ def init_case(case_id: str, subject: str, as_of: str, system_type: str,
         'as_of': as_of,
         'created_at': datetime.now().isoformat(),
         'budget_cap': budget_cap,
+        'baseline_revision': baseline_revision,
         'paths': PATHS,
         'rounds': list(ROUNDS),
         'runs': {},
@@ -110,6 +112,12 @@ def record_run(case_id: str, path: str, round_name: str, output_text: str,
     missing = [k for k in BUDGET_KEYS if k not in budget_used]
     if missing:
         return {'errors': [f'budget_used 缺 {missing}——没有花费记录就无法判断可比性']}
+    invalid = [k for k in BUDGET_KEYS
+               if not isinstance(budget_used[k], (int, float))
+               or isinstance(budget_used[k], bool)
+               or not math.isfinite(budget_used[k]) or budget_used[k] < 0]
+    if invalid:
+        return {'errors': [f'budget_used 的 {invalid} 必须是有限的非负数']}
 
     fname = f'{round_name}__{path}.md'
     (case_dir(case_id) / 'outputs' / fname).write_text(output_text, encoding='utf-8')
@@ -187,11 +195,13 @@ def check_comparability(case_id: str, round_name: str) -> dict:
 
     def _ratio(key):
         values = {p: runs[p]['budget_used'][key] for p in PATHS}
-        nonzero = [v for v in values.values() if v > 0]
-        if not nonzero:
+        values_set = set(values.values())
+        if values_set == {0}:
             return values, None
-        lo, hi = min(nonzero), max(values.values())
-        return values, (hi / lo if lo else float('inf'))
+        if 0 in values_set:
+            return values, float('inf')
+        lo, hi = min(values.values()), max(values.values())
+        return values, hi / lo
 
     # ── 硬校验：授予的资源必须等量，超出预登记上限同样不可用 ──
     for key in GRANTED_KEYS:
@@ -211,6 +221,24 @@ def check_comparability(case_id: str, round_name: str) -> dict:
             over = [p for p, v in values.items() if v > cap[key]]
             if over:
                 problems.append(f'{key} 超出预登记上限 {cap[key]}：{over}')
+
+    # 正式对照必须冻结旧版完整执行闭包，而非只复制一份 SKILL 文本。
+    # 旧试跑未声明 baseline_revision，保留为开发记录但不能被误作正式对照。
+    baseline_revision = manifest.get('baseline_revision')
+    if baseline_revision:
+        required_closure = ('code_revision', 'dependency_snapshot', 'prompt_snapshot',
+                            'materials_digest')
+        for path in PATHS:
+            artifacts = runs[path].get('artifacts') or {}
+            missing = [k for k in required_closure if not artifacts.get(k)]
+            if missing:
+                problems.append(f'{path} 缺执行闭包凭证 {missing}——不得作为正式可复现对照')
+        actual = (runs.get('A_current', {}).get('artifacts') or {}).get('code_revision')
+        if actual and actual != baseline_revision:
+            problems.append(
+                f'A_current 实际代码版本 {actual} 不等于冻结旧版 {baseline_revision}——'
+                '旧提示词混入新版依赖，不能作为基线'
+            )
 
     # ── 成本发现：消耗差异不阻断，但必须成为结论的限定条件 ──
     cost = {}

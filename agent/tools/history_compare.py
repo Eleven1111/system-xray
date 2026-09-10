@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from agent.store.db import load_latest
+from agent.tools.temporal import comparability
 
 
 def _parse_ymd(s) -> datetime | None:
@@ -84,6 +85,7 @@ def compare_history(system_name: str, current: dict, previous: dict | None = Non
 
     current_scores  = current.get('dimension_scores', {})
     previous_scores = previous.get('dimension_scores', {})
+    basis = comparability(current, previous)
 
     delta        = {}
     deteriorating = []
@@ -94,6 +96,9 @@ def compare_history(system_name: str, current: dict, previous: dict | None = Non
     for dim, cur_score in current_scores.items():
         prev_score = previous_scores.get(dim)
         if prev_score is None:
+            continue
+        if dim in basis['incomparable_dims']:
+            incomparable.append(dim)
             continue
         # `unknown` / `not_applicable` 不是分数，不做差（S0：缺资料不用中间分填补）
         if not _is_num(cur_score) or not _is_num(prev_score):
@@ -112,8 +117,9 @@ def compare_history(system_name: str, current: dict, previous: dict | None = Non
     # 整体评分对比
     if incomparable:
         warnings.append(
-            f'以下维度本期或上期为 unknown / not_applicable，不可做差：{sorted(incomparable)}'
+            f'以下维度本期或上期不可比（unknown/not_applicable 或口径变更）：{sorted(incomparable)}'
         )
+    warnings += basis['warnings']
 
     cur_overall  = current.get('overall_score')
     prev_overall = previous.get('overall_score')

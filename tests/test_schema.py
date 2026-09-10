@@ -50,6 +50,20 @@ def test_minimal_instance_passes():
     assert _errors(_minimal()) == []
 
 
+def test_schema_document_projects_to_a_valid_runtime_analysis():
+    from agent.schema_adapter import to_runtime
+    from agent.validation import validate_contract
+    errors, _ = validate_contract(to_runtime(_minimal()))
+    assert errors == []
+
+
+def test_runtime_contract_projects_to_a_valid_schema_document():
+    from agent.schema_adapter import to_document
+    from tests.test_contract import _base
+    assert _errors(to_document(_base(), system_name='X', system_type='other',
+                               analysis_date='2026-01-01')) == []
+
+
 def test_dimension_specific_enum_is_enforced():
     # 回归：Draft 7 的 $ref 同级扩展曾让这个非法值静默通过
     a = _minimal()

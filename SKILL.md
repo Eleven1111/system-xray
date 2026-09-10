@@ -57,7 +57,7 @@ python3 -m agent.agent --estimate-effect --input l3.json          # L3：{mechan
   最重要的输出不是曲线，是**稳健性判定**——在参数区间的角点上重跑，定性结论一翻转就报
   `robust=false` 并点名是哪个参数翻的。**没有 `parameter_ranges` 就拒绝出结论**：
   单点运行只是把任意假设包装成结果。
-- **L3**（`causal_adapter.py`）：先能力检测。装了 DoWhy 就用 DoWhy；没装则用内置最小双重差分，
+- **L3**（`causal_adapter.py`）：先能力检测。当前执行器始终使用内置最小双重差分；即使环境装有 DoWhy 也不会声称已调用它，
   并在输出里**明确标注它不是 DoWhy 的替代品**。数字永远与识别假设、适用群体、时间范围、
   安慰剂与留一反驳结果一起出现。数据形状不支持所选策略（比如没有对照组）→ 拒绝估计。
 
@@ -721,8 +721,8 @@ For each of the 21 dimension pairs (C(7,2)=21), ask:
 > "Does Di's current state amplify or suppress Dj's risk/health? Through what specific mechanism?"
 
 Classification:
-- **Strong**: Di changing 1 point would shift Dj by ≥0.5 points
-- **Weak**: Transmission mechanism exists but influence is uncertain or indirect
+- **Strong**: 有明确传导机制与可观察的中间变量；不把序数评分差当作效果量
+- **Weak**: 传导机制存在但证据不足、影响不确定或间接
 - **None**: No plausible transmission mechanism
 
 Record only Strong and Weak interactions (expect 5-12 meaningful pairs per analysis).
@@ -733,8 +733,8 @@ Encode the Strong/Weak interactions from Step 3a as causal edges and feed them t
 
 | Type | Definition | Danger Level |
 |------|-----------|-------------|
-| Vicious Cycle | Reinforcing loop + low scores or down-trajectory | High: exponential deterioration |
-| Virtuous Cycle | Reinforcing loop + high scores, no down-trajectory | Positive but may create fragile dependency |
+| Vicious Cycle | Reinforcing loop + 低分或下行线索 | 高优先级待检验风险，不推断恶化幅度或速度 |
+| Virtuous Cycle | Reinforcing loop + 高分且无下行线索 | 待检验的正向反馈，仍可能包含脆弱依赖 |
 | Antagonism | Balancing loop (odd number of negative edges) | Medium: improving one dimension may cost another |
 | Indeterminate | Reinforcing loop, but ≥1 dimension in it has no numeric score | Polarity is known; **direction and valence are not** |
 

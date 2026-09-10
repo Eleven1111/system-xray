@@ -105,6 +105,21 @@ def test_stock_never_goes_negative():
     assert min(simulate(m)['series']['buffer']) >= 0.0
 
 
+def test_multiple_outflows_share_one_source_stock_without_creating_resource():
+    # 回归：原实现逐条按初始库存截断，10 的库存可同时流出 8 + 8。
+    m = {'stocks': {'source': 10.0, 'left': 0.0, 'right': 0.0},
+         'time_step': 1.0, 'horizon': 1.0,
+         'flows': [
+             {'name': 'to_left', 'from': 'source', 'to': 'left',
+              'rate': {'kind': 'const', 'value': 8.0}},
+             {'name': 'to_right', 'from': 'source', 'to': 'right',
+              'rate': {'kind': 'const', 'value': 8.0}},
+         ]}
+    result = simulate(m)
+    assert result['final'] == {'source': 0.0, 'left': 5.0, 'right': 5.0}
+    assert sum(result['final'].values()) == 10.0
+
+
 def test_wide_parameter_range_flips_verdict_and_is_reported():
     r = run_with_sensitivity(_model(), {'stock': 'backlog', 'test': 'above', 'threshold': 50})
     assert r['robust'] is False
@@ -116,6 +131,19 @@ def test_narrow_defensible_range_is_robust():
     m = _model(ranges={'outflow.coefficient': [0.08, 0.12]})
     r = run_with_sensitivity(m, {'stock': 'backlog', 'test': 'above', 'threshold': 50})
     assert r['robust'] is True
+
+
+def test_one_at_a_time_scan_does_not_claim_full_interval_robustness():
+    m = {'stocks': {'x': 0.0}, 'time_step': 1.0, 'horizon': 1.0,
+         'flows': [
+             {'name': f'f{i}', 'to': 'x', 'rate': {'kind': 'const', 'value': 1.0}}
+             for i in range(4)
+         ],
+         'parameter_ranges': {f'f{i}.value': [0.0, 2.0] for i in range(4)}}
+    result = run_with_sensitivity(m, {'stock': 'x', 'test': 'below', 'threshold': 6.0})
+    assert result['coverage'] == 'one_at_a_time'
+    assert result['robust'] is None
+    assert '未证明' in result['conclusion']
 
 
 def test_baseline_runs_at_range_midpoint_not_declared_point():
@@ -206,4 +234,15 @@ def test_backend_absence_is_reported_not_hidden():
     r = estimate_effect(_l3_ready(), {'strategy': 'difference_in_differences', 'data': _panel()})
     if not backends['dowhy']['available']:
         assert r['backend_used'] == 'builtin_did'
-        assert any('DoWhy 未安装' in f for f in r['flags'])
+        assert any('没有执行 DoWhy' in f for f in r['flags'])
+
+
+def test_installed_dowhy_is_never_reported_as_used(monkeypatch):
+    import agent.tools.causal_adapter as adapter
+    real = adapter.detect_backends
+    monkeypatch.setattr(adapter, 'detect_backends', lambda: {
+        **real(), 'dowhy': {'available': True, 'version': 'test'}
+    })
+    r = estimate_effect(_l3_ready(), {'strategy': 'difference_in_differences', 'data': _panel()})
+    assert r['backend_used'] == 'builtin_did'
+    assert any('没有执行 DoWhy' in f for f in r['flags'])

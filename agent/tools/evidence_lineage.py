@@ -138,6 +138,19 @@ def affected_by_contradiction(analysis: dict) -> dict:
     """
     claims = analysis.get('claims') or analysis.get('key_claims') or []
     known_ids = _known_object_ids(analysis)
+    # 声明式关系与旧版 claims.loads 同等有效：机制直接引用支撑断言，
+    # 行动再引用机制时，反证必须沿这两段继续传播。
+    claim_to_mechanisms: dict[str, list[str]] = {}
+    mechanism_to_actions: dict[str, list[str]] = {}
+    for mechanism in analysis.get('mechanisms') or []:
+        if not isinstance(mechanism, dict) or not mechanism.get('id'):
+            continue
+        for claim_id in ((mechanism.get('supporting_claims') or []) +
+                         (mechanism.get('contradicting_claims') or [])):
+            claim_to_mechanisms.setdefault(claim_id, []).append(mechanism['id'])
+    for action in analysis.get('actions') or []:
+        if isinstance(action, dict) and action.get('id') and action.get('mechanism_id'):
+            mechanism_to_actions.setdefault(action['mechanism_id'], []).append(action['id'])
 
     contradicted, needs_review, dangling = [], {}, []
     for c in claims:
@@ -152,8 +165,14 @@ def affected_by_contradiction(analysis: dict) -> dict:
         if status != 'contradicted':
             continue
         contradicted.append({'id': c.get('id'), 'statement': c.get('statement') or c.get('claim', '')})
-        for target in loads:
+        targets = set(loads) | set(claim_to_mechanisms.get(c.get('id'), []))
+        for target in targets:
             needs_review.setdefault(target, []).append(c.get('id'))
+
+    # 机制已需复核时，所有以其为因果前提的行动也需复核。
+    for mechanism_id, claim_ids in list(needs_review.items()):
+        for action_id in mechanism_to_actions.get(mechanism_id, []):
+            needs_review.setdefault(action_id, []).extend(claim_ids)
 
     return {
         'contradicted_claims': contradicted,

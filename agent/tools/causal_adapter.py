@@ -9,9 +9,8 @@ Tool: L3 因果效果估计适配层（能力检测 + 最小内置估计器）
 1. **入口门**（`causal_readiness`）：机制卡有没有估计目标、识别策略、数据来源、
    反驳方案、适用群体与时间范围。缺任何一项 → 停在 L1。
 2. **数据门**：数据形状能不能支撑所选识别策略（有没有对照组、有没有干预前观测）。
-3. **后端**：装了 DoWhy 就用 DoWhy 的识别—估计—反驳全流程；
-   没装则用**内置最小估计器**（双重差分 + 安慰剂 + 留一稳健性），
-   并在输出里明确标注它**不是** DoWhy 的替代品。
+3. **后端**：当前实现只提供**内置最小估计器**（双重差分 + 安慰剂 + 留一稳健性）。
+   即使环境安装了 DoWhy，也不会把它误报为已执行；正式 DoWhy 工作流须另行实现。
 
 内置估计器只用标准库，不引入任何依赖。它算得对，但它的能力边界很窄：
 线性双重差分、无协变量调整、无面板自相关处理。**识别假设是分析者的，不是它验证的**——
@@ -177,12 +176,11 @@ def estimate_effect(mechanism: dict, spec: dict) -> dict:
         flags.append(
             f'留一检验：去掉单位 {loo["flipping_units"]} 后估计变号——结论悬于单个单位'
         )
-    if not backends['dowhy']['available']:
-        flags.append(
-            'DoWhy 未安装，使用内置最小双重差分。它没有 DoWhy 的识别机制、'
-            '协变量调整与多种反驳器——把这个数当作**方向性证据**，'
-            '需要正式结论时装 DoWhy 或交由专业工作流复算'
-        )
+    flags.append(
+        '本次使用内置最小双重差分；当前代码没有执行 DoWhy，即使环境中安装了它。'
+        '它没有协变量调整、面板自相关处理与 DoWhy 的识别/反驳流程——把这个数当作'
+        '**方向性证据**，需要正式结论时使用经实现和验证的专业工作流复算'
+    )
 
     return {
         'estimand': mechanism.get('estimand'),
@@ -194,7 +192,7 @@ def estimate_effect(mechanism: dict, spec: dict) -> dict:
         'refutations': {'placebo': placebo, 'leave_one_out': loo},
         'applicable_population': mechanism.get('applicable_population'),
         'applicable_period': mechanism.get('applicable_period'),
-        'backend_used': 'dowhy' if backends['dowhy']['available'] else 'builtin_did',
+        'backend_used': 'builtin_did',
         'backends': backends,
         'assumptions_are_the_analysts': (
             '平行趋势、无干预前预期效应、无溢出——这些假设由分析者承担，'

@@ -24,6 +24,10 @@ FROZEN_FIELDS = (
     'confidence', 'dimension_link', 'source_step',
 )
 
+# 版本更新只能改变判断强度及其依据。允许任意字段会让调用者通过新增/替换
+# 裁定语义绕过冻结规则，即使四个旧字段保持不变也会破坏可比性。
+MUTABLE_UPDATE_FIELDS = {'confidence', 'update_reason', 'evidence_update'}
+
 # 复盘取版本的策略。必须**预先**选定，不得在看到结果后再挑。
 REVIEW_POLICIES = ('first', 'lead_time')
 
@@ -70,6 +74,10 @@ def freeze_predictions(predictions: list[dict], frozen_at: str,
         if missing:
             errors.append(f'预测 "{pid}" 缺少必须冻结的字段：{missing}')
             continue
+        if not isinstance(p['confidence'], (int, float)) or isinstance(p['confidence'], bool) \
+                or not 0 <= p['confidence'] <= 1:
+            errors.append(f'预测 "{pid}".confidence 必须是 [0, 1] 内的数字')
+            continue
         if p['event_type'] not in VALID_EVENT_TYPES or p['event_type'] == 'unspecified':
             errors.append(
                 f'预测 "{pid}".event_type 必须是 '
@@ -99,13 +107,16 @@ def update_prediction(registry: list[dict], prediction_id: str, updates: dict,
         return {'registry': registry, 'errors': [f'登记册中没有预测 "{prediction_id}"']}
 
     latest = max(versions, key=lambda p: p.get('version', 1))
-    immutable = {'prediction', 'falsification_condition', 'time_horizon', 'event_type'}
-    illegal = sorted(k for k in updates if k in immutable and updates[k] != latest.get(k))
+    illegal = sorted(k for k in updates if k not in MUTABLE_UPDATE_FIELDS)
     if illegal:
         return {'registry': registry, 'errors': [
-            f'字段 {illegal} 在登记时已冻结，不能修改——改变事件定义或裁定窗口的是**另一条预测**，'
-            f'请用新 id 重新登记，否则跨期成绩无法解释'
+            f'字段 {illegal} 不在允许更新列表 {sorted(MUTABLE_UPDATE_FIELDS)} 中——'
+            f'事件定义、裁定窗口及关联语义在登记时已冻结；改变它们请用新 id 重新登记'
         ]}
+    if 'confidence' in updates and (not isinstance(updates['confidence'], (int, float))
+                                    or isinstance(updates['confidence'], bool)
+                                    or not 0 <= updates['confidence'] <= 1):
+        return {'registry': registry, 'errors': ['confidence 必须是 [0, 1] 内的数字']}
 
     new_version = dict(latest)
     new_version.update(updates)

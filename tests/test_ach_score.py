@@ -139,3 +139,14 @@ def test_strongest_i_recorded():
     by_id = {r['id']: r for r in result['ranking']}
     assert by_id['H1']['strongest_i']['tier'] == 1
     assert by_id['H1']['strongest_i']['description'] == '强证据'
+
+
+def test_single_evidence_family_is_not_claimed_leave_one_out_robust():
+    from agent.tools.ach_score import score_hypotheses
+    result = score_hypotheses(
+        [_h('H1'), _h('H2')],
+        [_ev({'H1': 'C', 'H2': 'I'}, tier=1)],
+    )
+    assert result['sensitivity']['robust'] is None
+    assert result['sensitivity']['adequate_for_leave_one_out'] is False
+    assert any('无法执行' in f for f in result['flags'])
